@@ -172,16 +172,19 @@ export async function getFeaturedTradespeople(
 
 /**
  * Top-vakmensen op rating + quality score, voor de homepage "drie uit de gids".
+ * Accepteert zowel `ratingAvg` (eigen reviews) als `googleRating` (extern) —
+ * vóór fase 7 zijn er nog geen eigen reviews dus googleRating is de bron.
  */
 export async function getTopTradespeople(limit = 3): Promise<PublicTradesperson[]> {
   return prisma.tradesperson.findMany({
     where: {
-      ratingAvg: { not: null },
+      OR: [{ ratingAvg: { not: null } }, { googleRating: { not: null } }],
       qualityScore: { gte: 50 },
     },
     select: PUBLIC_SELECT,
     orderBy: [
       { ratingAvg: { sort: 'desc', nulls: 'last' } },
+      { googleRating: { sort: 'desc', nulls: 'last' } },
       { qualityScore: 'desc' },
       { ratingCount: 'desc' },
     ],

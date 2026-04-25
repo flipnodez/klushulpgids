@@ -1,0 +1,8 @@
+.wrap {
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.number {
+  font-weight: 600;
+}

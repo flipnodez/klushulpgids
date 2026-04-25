@@ -1,7 +1,7 @@
 @import '../styles/design-tokens.css';
 
 /* ============================================================================
-   Base reset + body styling
+   Base reset + body
    ============================================================================ */
 
 *,
@@ -55,6 +55,7 @@ h4 {
   font-family: var(--font-sans, var(--font-sans-fallback));
   font-weight: 600;
   font-size: var(--fs-h4);
+  letter-spacing: 0;
   margin: 0;
 }
 
@@ -64,14 +65,28 @@ p {
 
 a {
   color: var(--ink);
+  text-decoration: underline;
   text-decoration-thickness: 1px;
-  text-underline-offset: 2px;
+  text-underline-offset: 3px;
   transition: color var(--t-fast);
 }
 
 a:hover,
 a:focus-visible {
   color: var(--accent);
+}
+
+a.plain {
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+  padding: 0;
 }
 
 /* Focus ring — keyboard-only */
@@ -81,7 +96,7 @@ a:focus-visible {
 }
 
 /* ============================================================================
-   Editorial helpers
+   Editorial typography helpers
    ============================================================================ */
 
 .serif {
@@ -104,6 +119,20 @@ a:focus-visible {
   color: var(--accent);
 }
 
+.muted {
+  color: var(--muted);
+}
+.text-sm {
+  font-size: var(--fs-sm);
+}
+.text-xs {
+  font-size: var(--fs-xs);
+}
+
+/* ============================================================================
+   Rules — horizontal lines (kernelement van het systeem)
+   ============================================================================ */
+
 .rule {
   border: 0;
   border-top: var(--rule-width) solid var(--rule);
@@ -120,6 +149,10 @@ a:focus-visible {
   margin: 0;
 }
 
+/* ============================================================================
+   Stamp — signature element (rode outlined-tekst, papieren-stempel)
+   ============================================================================ */
+
 .stamp {
   display: inline-block;
   font-family: var(--font-sans, var(--font-sans-fallback));
@@ -131,6 +164,76 @@ a:focus-visible {
   border: 1px solid var(--accent);
   padding: 4px 10px;
   border-radius: var(--radius);
+}
+
+/* ============================================================================
+   Tag — kleine inline label
+   ============================================================================ */
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border: 1px solid var(--rule-soft);
+  background: var(--paper);
+  color: var(--ink-2);
+  border-radius: var(--radius);
+}
+.tag-accent {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.tag-success {
+  color: var(--success);
+  border-color: var(--success);
+}
+
+/* ============================================================================
+   Drop cap — eerste letter editorial
+   ============================================================================ */
+
+.dropcap::first-letter {
+  font-family: var(--font-serif, var(--font-serif-fallback));
+  font-size: 68px;
+  font-weight: 600;
+  float: left;
+  line-height: 0.9;
+  padding: 6px 10px 0 0;
+  color: var(--accent);
+}
+
+/* ============================================================================
+   Stars (rating)
+   ============================================================================ */
+
+.stars {
+  display: inline-flex;
+  gap: 1px;
+  color: var(--warning);
+}
+
+/* ============================================================================
+   Container helpers
+   ============================================================================ */
+
+.row {
+  display: flex;
+  align-items: center;
+}
+.row-gap-1 {
+  gap: 4px;
+}
+.row-gap-2 {
+  gap: 8px;
+}
+.row-gap-3 {
+  gap: 12px;
+}
+.row-gap-4 {
+  gap: 16px;
 }
 
 /* ============================================================================

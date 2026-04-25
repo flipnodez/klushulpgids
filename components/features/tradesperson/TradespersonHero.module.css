@@ -1,0 +1,61 @@
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  padding: var(--sp-10) 0;
+}
+
+.title {
+  font-family: var(--font-serif, var(--font-serif-fallback));
+  font-size: clamp(40px, 6vw, 64px);
+  font-weight: 500;
+  letter-spacing: var(--ls-display);
+  line-height: var(--lh-display);
+  color: var(--ink);
+  margin: 0;
+}
+
+.italic {
+  font-style: italic;
+  color: var(--accent);
+}
+
+.subtitle {
+  font-size: var(--fs-lead);
+  font-family: var(--font-serif, var(--font-serif-fallback));
+}
+
+.rating {
+  margin-top: var(--sp-1);
+}
+
+.lede {
+  font-family: var(--font-serif, var(--font-serif-fallback));
+  font-size: var(--fs-lead);
+  line-height: var(--lh-lead);
+  color: var(--ink-2);
+  max-width: 65ch;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--sp-6);
+  margin: 0;
+  padding: var(--sp-4) 0;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.statValue {
+  font-family: var(--font-serif, var(--font-serif-fallback));
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}

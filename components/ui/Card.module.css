@@ -1,0 +1,46 @@
+.card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  display: block;
+}
+
+.v_default {
+  border: 1px solid var(--ink);
+}
+
+.v_soft {
+  border: 1px solid var(--rule-soft);
+}
+
+.v_paper-stamp {
+  border: 1px solid var(--ink);
+  box-shadow: var(--shadow-stamp);
+}
+
+.v_entry {
+  border: 1px solid var(--ink);
+  transition: background var(--t-fast);
+}
+
+.v_entry:hover {
+  background: var(--paper-2);
+}
+
+/* dark theme paper-2 hover wat lichter */
+:global(html[data-theme='dark']) .v_entry:hover {
+  background: #23282f;
+}
+
+/* Padding scale */
+.p_none {
+  padding: 0;
+}
+.p_sm {
+  padding: var(--sp-4);
+}
+.p_md {
+  padding: var(--sp-6);
+}
+.p_lg {
+  padding: var(--sp-8);
+}

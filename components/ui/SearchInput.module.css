@@ -1,0 +1,73 @@
+.form {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto;
+  align-items: stretch;
+  background: var(--surface);
+  border: 1px solid var(--ink);
+  border-radius: var(--radius);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: var(--sp-4) var(--sp-6);
+  gap: var(--sp-1);
+}
+
+.label {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+}
+
+.input {
+  background: transparent;
+  border: 0;
+  font-family: inherit;
+  font-size: var(--fs-body);
+  color: var(--ink);
+  padding: 0;
+  outline: none;
+}
+
+.input::placeholder {
+  color: var(--subtle);
+  font-style: italic;
+  font-family: var(--font-serif, var(--font-serif-fallback));
+}
+
+.divider {
+  width: 1px;
+  background: var(--ink);
+  align-self: stretch;
+}
+
+.submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ink);
+  color: var(--paper);
+  border: 0;
+  padding: 0 var(--sp-6);
+  cursor: pointer;
+  transition: background var(--t-fast);
+}
+
+.submit:hover,
+.submit:focus-visible {
+  background: var(--accent);
+}
+
+@media (max-width: 720px) {
+  .form {
+    grid-template-columns: 1fr;
+  }
+  .divider {
+    width: auto;
+    height: 1px;
+  }
+  .submit {
+    padding: var(--sp-3) 0;
+  }
+}

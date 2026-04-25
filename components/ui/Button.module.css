@@ -1,0 +1,108 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-family: var(--font-sans, var(--font-sans-fallback));
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  border-radius: var(--radius);
+  text-decoration: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition:
+    background var(--t-fast),
+    color var(--t-fast),
+    border-color var(--t-fast);
+}
+
+.btn:disabled,
+.btn[aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.fullWidth {
+  width: 100%;
+}
+
+/* Sizes */
+.sm {
+  padding: 8px 14px;
+  font-size: 13px;
+}
+.md {
+  padding: 12px 22px;
+  font-size: 14px;
+}
+.lg {
+  padding: 16px 28px;
+  font-size: 15px;
+}
+
+/* Variants */
+.primary {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+.primary:hover:not(:disabled),
+.primary:focus-visible:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--paper);
+  text-decoration: none;
+}
+
+.secondary {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--ink);
+}
+.secondary:hover:not(:disabled),
+.secondary:focus-visible:not(:disabled) {
+  background: var(--ink);
+  color: var(--paper);
+  text-decoration: none;
+}
+
+.ghost {
+  background: transparent;
+  color: var(--ink);
+  border-color: transparent;
+  padding-left: 0;
+  padding-right: 0;
+}
+.ghost:hover:not(:disabled),
+.ghost:focus-visible:not(:disabled) {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.link {
+  background: transparent;
+  color: var(--ink);
+  border: none;
+  padding: 0;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+.link:hover:not(:disabled),
+.link:focus-visible:not(:disabled) {
+  color: var(--accent);
+}
+
+.accent {
+  background: var(--accent);
+  color: var(--paper-2);
+  border-color: var(--accent);
+}
+.accent:hover:not(:disabled),
+.accent:focus-visible:not(:disabled) {
+  background: var(--accent-ink);
+  border-color: var(--accent-ink);
+  text-decoration: none;
+}

@@ -1,0 +1,17 @@
+data-pipeline
+Design concept
+.cache
+__pycache__
+sources
+*.py
+vakbedrijven*.json
+classify_relevantie.py
+enrich_all.py
+inspect.py
+merge_sources.py
+pilot_scrape.py
+pilot_results_10.json
+merge_report.json
+enrich_all.md
+docs/compliance
+tests

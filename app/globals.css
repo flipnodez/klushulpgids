@@ -1,0 +1,157 @@
+@import '../styles/design-tokens.css';
+
+/* ============================================================================
+   Base reset + body styling
+   ============================================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans, var(--font-sans-fallback));
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-serif, var(--font-serif-fallback));
+  font-weight: 500;
+  letter-spacing: var(--ls-h);
+  line-height: var(--lh-tight);
+  margin: 0;
+}
+
+h1 {
+  font-size: var(--fs-h1);
+  letter-spacing: var(--ls-display);
+}
+h2 {
+  font-size: var(--fs-h2);
+}
+h3 {
+  font-size: var(--fs-h3);
+}
+h4 {
+  font-family: var(--font-sans, var(--font-sans-fallback));
+  font-weight: 600;
+  font-size: var(--fs-h4);
+  margin: 0;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--ink);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  transition: color var(--t-fast);
+}
+
+a:hover,
+a:focus-visible {
+  color: var(--accent);
+}
+
+/* Focus ring — keyboard-only */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ============================================================================
+   Editorial helpers
+   ============================================================================ */
+
+.serif {
+  font-family: var(--font-serif, var(--font-serif-fallback));
+  letter-spacing: -0.01em;
+}
+
+.label {
+  font-family: var(--font-sans, var(--font-sans-fallback));
+  text-transform: uppercase;
+  letter-spacing: var(--ls-label);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  color: var(--ink);
+}
+.label-muted {
+  color: var(--muted);
+}
+.label-accent {
+  color: var(--accent);
+}
+
+.rule {
+  border: 0;
+  border-top: var(--rule-width) solid var(--rule);
+  margin: 0;
+}
+.rule-thick {
+  border: 0;
+  border-top: var(--rule-width-thick) solid var(--rule);
+  margin: 0;
+}
+.rule-soft {
+  border: 0;
+  border-top: 1px solid var(--rule-soft);
+  margin: 0;
+}
+
+.stamp {
+  display: inline-block;
+  font-family: var(--font-sans, var(--font-sans-fallback));
+  font-size: var(--fs-label);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  padding: 4px 10px;
+  border-radius: var(--radius);
+}
+
+/* ============================================================================
+   Skip link (accessibility)
+   ============================================================================ */
+
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: var(--sp-4);
+  background: var(--ink);
+  color: var(--paper);
+  padding: var(--sp-2) var(--sp-4);
+  z-index: 100;
+  text-decoration: none;
+  font-family: var(--font-sans, var(--font-sans-fallback));
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.skip-link:focus {
+  top: var(--sp-4);
+  color: var(--paper);
+}

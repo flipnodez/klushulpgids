@@ -1,0 +1,57 @@
+{
+  "name": "Klushulpgids",
+  "description": "Klushulpgids.nl — Nederlandse vakmannen-gids",
+  "repository": "https://github.com/klushulpgids/klushulpgids",
+  "logo": "https://klushulpgids.nl/icon.svg",
+  "keywords": ["next.js", "nl", "vakmannen", "gids"],
+  "addons": [
+    { "plan": "postgresql:postgresql-starter-512" },
+    { "plan": "redis:redis-starter-256" }
+  ],
+  "env": {
+    "NODE_ENV": {
+      "description": "Node environment",
+      "value": "production"
+    },
+    "NEXTAUTH_URL": {
+      "description": "Public URL voor NextAuth callbacks (vanaf fase 6)",
+      "value": "https://klushulpgids.nl",
+      "required": false
+    },
+    "NEXTAUTH_SECRET": {
+      "description": "Random secret voor NextAuth (vanaf fase 6) — 32+ chars",
+      "generator": "secret",
+      "required": false
+    },
+    "ENCRYPTION_KEY": {
+      "description": "Sleutel voor versleutelen gevoelige velden (vanaf fase 2) — 32+ chars",
+      "generator": "secret",
+      "required": false
+    },
+    "REVALIDATE_SECRET": {
+      "description": "Token voor on-demand revalidate API",
+      "generator": "secret",
+      "required": false
+    },
+    "NEXT_PUBLIC_PLAUSIBLE_DOMAIN": {
+      "description": "Plausible analytics domain",
+      "value": "klushulpgids.nl"
+    },
+    "NEXT_PUBLIC_FEATURE_PREMIUM_LISTINGS": { "value": "false" },
+    "NEXT_PUBLIC_FEATURE_SPONSORED": { "value": "false" },
+    "NEXT_PUBLIC_FEATURE_DISPLAY_ADS": { "value": "false" },
+    "NEXT_PUBLIC_FEATURE_PAYMENTS": { "value": "false" },
+    "NEXT_PUBLIC_FEATURE_COMPARE": { "value": "false" },
+    "NEXT_PUBLIC_FEATURE_ADV_ANALYTICS": { "value": "false" }
+  },
+  "scripts": {},
+  "formation": {
+    "web": {
+      "amount": 1,
+      "size": "S"
+    }
+  },
+  "default_environment": {
+    "NODE_VERSION": "20.x"
+  }
+}

@@ -44,7 +44,9 @@
     "NEXT_PUBLIC_FEATURE_COMPARE": { "value": "false" },
     "NEXT_PUBLIC_FEATURE_ADV_ANALYTICS": { "value": "false" }
   },
-  "scripts": {},
+  "scripts": {
+    "postdeploy": "npx prisma migrate deploy"
+  },
   "formation": {
     "web": {
       "amount": 1,

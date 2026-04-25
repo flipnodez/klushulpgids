@@ -126,6 +126,33 @@ Zie [`docs/database.md`](./database.md#productie--eenmalige-seedimport).
 | Bron-bestand               | `vakbedrijven_merged.json` (11K records) ipv `vakbedrijven_part3.json` | Founder voorkeur (uitgebreidere set)                                                                 |
 | `data.js` import           | Vertaald naar TS-seed met SEO-templates                                | `data.js` is browser-prototype, niet importeerbaar in Node; trades + cities overgenomen + uitgebreid |
 
+## ⚠ Open issue: Scalingo deploy-hooks werken niet voor deze app
+
+Tijdens de uitrol van fase 2 ontdekt: **noch Procfile `release:`, noch
+scalingo.json `scripts.postdeploy` worden door Scalingo automatisch
+uitgevoerd** voor deze app. Beide zijn geprobeerd (zie commits `f9d956a` en
+`5615ac8`); geen van beide triggert een container in de logs.
+
+**Werk-flow voor toekomstige schema-wijzigingen:**
+
+```bash
+# 1. Lokaal: maak schema-wijziging, run migrate dev, commit + push
+npm run db:migrate -- --name <descriptive>
+git add prisma/migrations/ prisma/schema.prisma
+git commit -m "..."
+git push origin main
+
+# 2. Wacht tot Scalingo deploy klaar is (~2 min)
+
+# 3. Run migrate handmatig op productie
+scalingo --app klushulpgids run "npx prisma migrate deploy"
+```
+
+Vergeten van stap 3 leidt tot 502/runtime errors omdat de productie-app het
+nieuwe schema verwacht maar de DB nog niet gemigreerd is. Mogelijk werkt het
+hook-mechanisme weer wanneer we naar een betaald Scalingo plan gaan, of na
+contact met support.
+
 ## Aandachtspunten voor fase 3
 
 - `lib/queries/tradespeople.ts` `searchTradespeople()` doet `contains` queries

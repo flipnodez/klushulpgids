@@ -1,0 +1,35 @@
+.crumbWrap {
+  padding: var(--sp-5) 0;
+}
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--sp-4) 0 var(--sp-12);
+  max-width: 880px;
+}
+.title {
+  font-family: var(--font-serif, var(--font-serif-fallback));
+  font-size: clamp(40px, 6vw, 64px);
+  font-weight: 500;
+  letter-spacing: var(--ls-display);
+  line-height: var(--lh-display);
+  margin: 0;
+}
+.italic {
+  font-style: italic;
+  color: var(--accent);
+}
+.lede {
+  font-family: var(--font-serif, var(--font-serif-fallback));
+  font-size: var(--fs-lead);
+  line-height: var(--lh-lead);
+  color: var(--ink-2);
+  max-width: 65ch;
+}
+.section {
+  padding: var(--sp-12) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}

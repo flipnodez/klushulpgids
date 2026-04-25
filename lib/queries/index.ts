@@ -1,3 +1,4 @@
+export * from './blog'
 export * from './cities'
 export * from './reviews'
 export * from './trades'

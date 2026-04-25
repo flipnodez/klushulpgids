@@ -1,0 +1,63 @@
+.crumbWrap {
+  padding: var(--sp-5) 0;
+}
+.article {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--sp-4) 0 var(--sp-12);
+}
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-6) 0;
+}
+.title {
+  font-family: var(--font-serif, var(--font-serif-fallback));
+  font-size: clamp(36px, 5.5vw, 56px);
+  font-weight: 500;
+  letter-spacing: var(--ls-display);
+  line-height: 1.1;
+  margin: 0;
+}
+.section {
+  padding: var(--sp-5) 0;
+  border-top: 1px solid var(--rule-soft);
+  font-family: var(--font-serif, var(--font-serif-fallback));
+  font-size: 17px;
+  line-height: var(--lh-body);
+  color: var(--ink-2);
+}
+.section:first-of-type {
+  border-top: 0;
+}
+.section h2 {
+  font-family: var(--font-serif, var(--font-serif-fallback));
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin: 0 0 var(--sp-3);
+  color: var(--ink);
+}
+.section p {
+  margin: 0 0 var(--sp-3);
+}
+.section ul {
+  padding-left: var(--sp-6);
+  margin: 0 0 var(--sp-3);
+}
+.section ul li {
+  margin-bottom: var(--sp-2);
+}
+.section a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.section a:hover {
+  color: var(--accent);
+}
+.section strong {
+  color: var(--ink);
+  font-weight: 500;
+}

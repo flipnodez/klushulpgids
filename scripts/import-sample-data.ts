@@ -121,6 +121,19 @@ const SBI_TO_TRADE: Record<string, string> = {
   '81300': 'hoveniers',
 }
 
+// Brancheverenigingen / certificerende bronnen → trade fallback wanneer
+// geen zoekterm of SBI beschikbaar is. Pure heuristiek; vakman kan dit later
+// zelf corrigeren via dashboard (fase 6).
+const SOURCE_TO_TRADE: Record<string, string> = {
+  bouwendnederland: 'klusbedrijven', // generieke bouwsector
+  bouwgarant: 'klusbedrijven',
+  onderhoudnl: 'klusbedrijven', // onderhoudsbedrijven
+  vlok: 'loodgieters', // Verbond Loodgieters Onderhoud Klimaat
+  nvkl: 'cv-monteurs', // Koel- en luchtbehandelingstechniek
+  groenkeur: 'hoveniers',
+  technieknl: 'klusbedrijven', // fallback enkel als zoekterm/SBI ontbreken
+}
+
 function matchTrades(
   rec: RawRecord,
   tradeSlugById: Map<string, string>,
@@ -180,7 +193,20 @@ function matchTrades(
     }
   }
 
-  // 3. Filter: alleen trades die we kennen
+  // 3. Source-based fallback wanneer zoekterm + SBI niets opleverden
+  if (matches.size === 0) {
+    const sources = rec._sources ?? (rec._source ? [rec._source] : [])
+    for (const src of sources) {
+      const slug = SOURCE_TO_TRADE[src]
+      if (slug && tradeSlugById.has(slug)) {
+        primary = slug
+        matches.set(slug, { isPrimary: true })
+        break
+      }
+    }
+  }
+
+  // 4. Filter: alleen trades die we kennen
   const all = [...matches.entries()]
     .filter(([slug]) => tradeSlugById.has(slug))
     .map(([slug, meta]) => ({ slug, ...meta }))
@@ -474,9 +500,22 @@ async function importOne(
   } else {
     const baseSlug = slugify(companyName)
     const slug = uniqueSlug(ctx.existingSlugs, baseSlug || `bedrijf-${sourceId}`)
-    tradesperson = await prisma.tradesperson.create({
-      data: { ...data, slug },
-    })
+    try {
+      tradesperson = await prisma.tradesperson.create({
+        data: { ...data, slug },
+      })
+    } catch (err) {
+      // Duplicaat emailHash: andere vakman heeft al dit email-adres geregistreerd.
+      // Retry zonder email — vakman kan later via dashboard claimen.
+      if (err instanceof Error && err.message.includes('emailHash')) {
+        noteReason('emailHash collision — saved without email')
+        tradesperson = await prisma.tradesperson.create({
+          data: { ...data, slug, email: null, emailHash: null },
+        })
+      } else {
+        throw err
+      }
+    }
     stats.imported++
   }
 

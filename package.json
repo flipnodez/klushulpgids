@@ -17,16 +17,16 @@
     "prepare": "husky",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
+    "db:migrate": "dotenv -e .env.local -- prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
-    "db:reset": "prisma migrate reset",
-    "db:studio": "prisma studio",
-    "db:seed": "tsx prisma/seed.ts",
-    "db:test": "tsx scripts/test-db.ts",
-    "db:import": "tsx scripts/import-sample-data.ts"
+    "db:reset": "dotenv -e .env.local -- prisma migrate reset",
+    "db:studio": "dotenv -e .env.local -- prisma studio",
+    "db:seed": "dotenv -e .env.local -- tsx prisma/seed.ts",
+    "db:test": "dotenv -e .env.local -- tsx scripts/test-db.ts",
+    "db:import": "dotenv -e .env.local -- tsx scripts/import-sample-data.ts"
   },
   "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "seed": "dotenv -e .env.local -- tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",
@@ -34,6 +34,7 @@
     "prisma": "6.19.3",
     "react": "19.0.0",
     "react-dom": "19.0.0",
+    "server-only": "^0.0.1",
     "zod": "3.24.1"
   },
   "devDependencies": {
@@ -41,6 +42,7 @@
     "@types/node": "22.10.5",
     "@types/react": "19.0.4",
     "@types/react-dom": "19.0.2",
+    "dotenv-cli": "^11.0.0",
     "eslint": "9.17.0",
     "eslint-config-next": "15.5.15",
     "husky": "9.1.7",

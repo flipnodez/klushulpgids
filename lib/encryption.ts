@@ -1,4 +1,6 @@
-import 'server-only'
+// Geen `import 'server-only'` hier: dit bestand wordt ook in scripts (tsx)
+// gebruikt buiten Next.js. Browser-import is sowieso onmogelijk doordat
+// `node:crypto` niet bundlebaar is.
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto'
 
 /**

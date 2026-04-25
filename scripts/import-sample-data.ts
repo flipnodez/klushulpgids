@@ -1,20 +1,23 @@
 /**
  * Import-script voor scraped vakbedrijven-data.
  *
- * Bron: vakbedrijven_merged.json (11K records uit technieknl/bouwendnederland/etc).
+ * Bron-default: prisma/seed-data/sample-tradespeople.json (2100 records, ~3.5MB,
+ * gecureerd uit alle 7 bronnen — staat in deploy). Fallback voor lokale full
+ * import: vakbedrijven_merged.json (11K records, niet in deploy).
+ *
  * Strategie:
  *  - Idempotent: re-runnen overschrijft niet, maar update bestaande records
  *    op (kvkNumber OR (sourceName, sourceId)).
  *  - Email versleuteld via lib/encryption.ts; emailHash voor lookup.
- *  - Trades gematcht via zoekterm + SBI-codes; cities op exacte slug-match.
- *  - Onbekende cities: cityId=null (gelogd), record blijft behouden.
+ *  - Trades gematcht via zoekterm + SBI-codes + source-fallback.
+ *  - Cities op exacte slug-match; onbekende cities → cityId=null.
  *  - Quality score 0-100 per criteria in phase-2-database.md §2.7.
  *
  * Run:
- *   npx tsx scripts/import-sample-data.ts                   # default = vakbedrijven_merged.json
- *   npx tsx scripts/import-sample-data.ts --file=foo.json   # custom file
- *   npx tsx scripts/import-sample-data.ts --limit=200       # stop na N records
- *   npx tsx scripts/import-sample-data.ts --dry-run         # geen DB-writes
+ *   npx tsx scripts/import-sample-data.ts                              # default = curated subset
+ *   npx tsx scripts/import-sample-data.ts --file=vakbedrijven_merged.json  # full set (lokaal)
+ *   npx tsx scripts/import-sample-data.ts --limit=200                  # stop na N records
+ *   npx tsx scripts/import-sample-data.ts --dry-run                    # geen DB-writes
  */
 
 import { readFileSync } from 'node:fs'
@@ -71,9 +74,18 @@ type RawRecord = {
 // CLI flags
 // ============================================================================
 
+import { existsSync } from 'node:fs'
+
+/**
+ * Default bron: gecureerde subset (`prisma/seed-data/sample-tradespeople.json`,
+ * 2100 records, ~3.5MB) die in de Scalingo deploy meegaat. Lokaal kun je met
+ * `--file=vakbedrijven_merged.json` de volledige 11K-set draaien.
+ */
 function parseArgs() {
   const args = process.argv.slice(2)
-  let file = 'vakbedrijven_merged.json'
+  const curatedPath = 'prisma/seed-data/sample-tradespeople.json'
+  const fullPath = 'vakbedrijven_merged.json'
+  let file = existsSync(curatedPath) ? curatedPath : fullPath
   let limit: number | null = null
   let dryRun = false
   for (const a of args) {

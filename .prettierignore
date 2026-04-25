@@ -11,3 +11,6 @@ vakbedrijven*.json
 sources
 .cache
 __pycache__
+
+# Seed data (gecureerd, niet door prettier laten formatteren)
+prisma/seed-data/sample-tradespeople.json

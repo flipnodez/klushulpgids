@@ -1,10 +1,25 @@
+import { PrismaClient } from '@prisma/client'
+
 /**
- * Database client placeholder.
+ * Prisma client singleton.
  *
- * In fase 2 wordt dit een Prisma client met singleton-pattern voor dev:
- *   import { PrismaClient } from '@prisma/client'
- *   export const db = globalThis.__db ?? new PrismaClient(...)
- *
- * In fase 1 leveren we alleen het bestandsskelet zodat imports stabiel zijn.
+ * In dev maakt Next.js elke HMR-reload een nieuwe module-instance — zonder
+ * singleton zou elke reload een nieuwe Postgres-connectie pool openen, wat
+ * binnen seconden de connection limit raakt. We pinnen dus de instance op
+ * globalThis voor dev/test; in productie is dat niet nodig (één boot = één
+ * instance).
  */
-export const db = null as unknown
+
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined
+}
+
+export const prisma =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+  })
+
+if (process.env.NODE_ENV !== 'production') {
+  globalForPrisma.prisma = prisma
+}

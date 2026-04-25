@@ -3,14 +3,14 @@ import { z } from 'zod'
 /**
  * Type-safe environment validation.
  *
- * Variabelen worden hier per fase strikter gemaakt:
+ * Per fase wordt de validatie strikter:
  *  - fase 1: alleen NODE_ENV + (optioneel) DATABASE_URL/REDIS_URL
- *  - fase 2: DATABASE_URL/REDIS_URL/ENCRYPTION_KEY verplicht
- *  - fase 6: NEXTAUTH_SECRET, LETTERMINT_API_KEY verplicht
- *  - fase 8: MOLLIE_API_KEY verplicht
+ *  - fase 2: DATABASE_URL + ENCRYPTION_KEY verplicht ← we zitten hier
+ *  - fase 6: NEXTAUTH_SECRET + LETTERMINT_API_KEY + FROM_EMAIL verplicht
+ *  - fase 8: MOLLIE_API_KEY + MOLLIE_WEBHOOK_SECRET verplicht
  *
- * In productie faalt de app bij missende kritieke vars; in dev/test loggen we
- * alleen een waarschuwing om DX soepel te houden.
+ * In productie faalt de app hard bij missende kritieke vars; in dev/test loggen
+ * we alleen een waarschuwing om DX soepel te houden.
  */
 
 const optionalUrl = z
@@ -27,8 +27,8 @@ const featureFlag = z
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 
-  // Infra (door Scalingo gezet)
-  DATABASE_URL: optionalUrl,
+  // Infra (door Scalingo gezet, lokaal via .env.local)
+  DATABASE_URL: z.string().url(),
   REDIS_URL: optionalUrl,
 
   // Auth (fase 6)
@@ -53,13 +53,17 @@ const envSchema = z.object({
   GOOGLE_SITE_VERIFICATION: z.string().optional(),
   BING_SITE_VERIFICATION: z.string().optional(),
 
-  // Encryption (fase 2)
-  ENCRYPTION_KEY: z.string().min(32).optional(),
+  // Encryption (fase 2 — verplicht voor scripts die encrypten/decrypten,
+  // gevalideerd at-use in lib/encryption.ts. 64 hex chars = 32 bytes AES-256).
+  ENCRYPTION_KEY: z
+    .string()
+    .regex(/^[0-9a-fA-F]{64}$/, 'ENCRYPTION_KEY must be 64 hex chars (32 bytes)')
+    .optional(),
 
   // Revalidation
   REVALIDATE_SECRET: z.string().optional(),
 
-  // Feature flags (fase 8) — public, dus prefixed met NEXT_PUBLIC_
+  // Feature flags
   NEXT_PUBLIC_FEATURE_PREMIUM_LISTINGS: featureFlag,
   NEXT_PUBLIC_FEATURE_SPONSORED: featureFlag,
   NEXT_PUBLIC_FEATURE_DISPLAY_ADS: featureFlag,
@@ -85,6 +89,11 @@ if (!parsed.success) {
   console.warn(`⚠ ${message}`)
 }
 
-export const env = parsed.success ? parsed.data : envSchema.parse({ NODE_ENV: 'development' })
+// In dev valideren we soft (warning) maar geven alsnog process.env terug zodat
+// scripts kunnen draaien als één var ontbreekt. In prod is parsed.success
+// gegarandeerd true (anders is er al een throw geweest).
+export const env = parsed.success
+  ? parsed.data
+  : (process.env as unknown as z.infer<typeof envSchema>)
 
 export type Env = z.infer<typeof envSchema>

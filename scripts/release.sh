@@ -9,3 +9,8 @@ if [ -f prisma/schema.prisma ]; then
 else
   echo "→ Skipping migrations (no prisma/schema.prisma yet — fase 1)"
 fi
+
+# Note: `prisma generate` draait automatisch via package.json postinstall hook.
+# De seed (trades + cities) wordt eenmalig handmatig getriggerd via:
+#   scalingo --app klushulpgids run "npx tsx prisma/seed.ts"
+# en niet hier, omdat het anders bij elke deploy opnieuw zou draaien.

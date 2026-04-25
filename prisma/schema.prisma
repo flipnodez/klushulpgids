@@ -1,0 +1,528 @@
+// Klushulpgids.nl — database schema
+// Bron: docs/phase-2-database.md (fase 2)
+// Convention: PascalCase models, camelCase velden, slugs zijn kebab-case strings.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// CORE: TRADES, CITIES, TRADESPEOPLE
+// ============================================================================
+
+model Trade {
+  id                     String   @id @default(uuid())
+  slug                   String   @unique
+  nameSingular           String
+  namePlural             String
+  description            String   @db.Text
+  iconName               String
+  seoTitleTemplate       String
+  seoDescriptionTemplate String   @db.Text
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  tradespeople TradespersonTrade[]
+  blogPosts    BlogPost[]
+
+  @@index([slug])
+}
+
+model City {
+  id         String   @id @default(uuid())
+  slug       String   @unique
+  name       String
+  province   String
+  latitude   Float
+  longitude  Float
+  population Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tradespeople Tradesperson[]
+  serviceAreas TradespersonServiceArea[]
+  blogPosts    BlogPost[]
+
+  @@index([slug])
+  @@index([province])
+}
+
+model Tradesperson {
+  id          String  @id @default(uuid())
+  slug        String  @unique
+  companyName String
+  contactName String?
+  kvkNumber   String? @unique
+  btwNumber   String?
+  description String? @db.Text
+
+  // Contact (email versleuteld via lib/encryption.ts)
+  email       String? // Encrypted: "iv:tag:ciphertext" hex string
+  emailHash   String? @unique // sha256 voor lookups & dedup
+  phone       String?
+  websiteUrl  String?
+  socialMedia Json?
+
+  // Adres
+  street      String?
+  houseNumber String?
+  postalCode  String?
+  cityId      String?
+  city        City?   @relation(fields: [cityId], references: [id])
+  latitude    Float?
+  longitude   Float?
+
+  // Bedrijf
+  hourlyRateMin    Int?
+  hourlyRateMax    Int?
+  yearsExperience  Int?
+  foundedYear      Int?
+  teamSize         TeamSize?
+  marketFocus      MarketFocus? @default(B2C)
+  emergencyService Boolean      @default(false)
+
+  // Beschikbaarheid
+  availabilityStatus    AvailabilityStatus @default(UNKNOWN)
+  availabilityUpdatedAt DateTime?
+  responseTime          String?
+
+  // Specialisaties (vrije tekst, gestructureerd)
+  specialties String[]
+
+  // Verificatie & herkomst
+  profileClaimed   Boolean   @default(false)
+  claimToken       String?   @unique
+  claimTokenExpiry DateTime?
+  kvkVerified      Boolean   @default(false)
+  kvkVerifiedAt    DateTime?
+
+  // Reviews-aggregaten (denormalized voor performance)
+  ratingAvg          Float?
+  ratingCount        Int    @default(0)
+  googleRating       Float?
+  googleReviewsCount Int?
+
+  // Monetisatie (schema klaar in fase 2, activatie pas in fase 8)
+  tier           Tier      @default(FREE)
+  tierStartedAt  DateTime?
+  tierExpiresAt  DateTime?
+  subscriptionId String?
+  featured       Boolean   @default(false)
+  featuredUntil  DateTime?
+  boostScore     Int       @default(0)
+
+  // Quality & sourcing
+  qualityScore     Int       @default(0)
+  sourcesUsed      String[]
+  sourceId         String?
+  sourceName       String?
+  privacySensitive Boolean   @default(false)
+  scrapedAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  trades               TradespersonTrade[]
+  serviceAreas         TradespersonServiceArea[]
+  certifications       TradespersonCertification[]
+  industryAssociations TradespersonAssociation[]
+  reviewSources        TradespersonReviewSource[]
+  photos               TradespersonPhoto[]
+  reviews              Review[]
+  pageViews            PageView[]
+
+  @@index([slug])
+  @@index([cityId])
+  @@index([availabilityStatus])
+  @@index([qualityScore(sort: Desc)])
+  @@index([featured])
+  @@index([tier])
+  @@index([boostScore(sort: Desc)])
+  @@index([ratingAvg(sort: Desc)])
+}
+
+enum TeamSize {
+  SOLO
+  SMALL
+  MEDIUM
+  LARGE
+}
+
+enum MarketFocus {
+  B2B
+  B2C
+  BOTH
+}
+
+enum AvailabilityStatus {
+  AVAILABLE_NOW
+  AVAILABLE_THIS_WEEK
+  AVAILABLE_THIS_MONTH
+  WAITLIST
+  NOT_ACCEPTING
+  UNKNOWN
+}
+
+enum Tier {
+  FREE
+  PRO
+  PREMIUM
+  ENTERPRISE
+}
+
+model TradespersonTrade {
+  tradespersonId String
+  tradeId        String
+  isPrimary      Boolean @default(false)
+  sbiCode        String?
+  sbiName        String?
+  sbiScore       Int?
+
+  tradesperson Tradesperson @relation(fields: [tradespersonId], references: [id], onDelete: Cascade)
+  trade        Trade        @relation(fields: [tradeId], references: [id])
+
+  @@id([tradespersonId, tradeId])
+  @@index([tradeId])
+}
+
+model TradespersonServiceArea {
+  tradespersonId String
+  cityId         String
+  tradesperson   Tradesperson @relation(fields: [tradespersonId], references: [id], onDelete: Cascade)
+  city           City         @relation(fields: [cityId], references: [id])
+
+  @@id([tradespersonId, cityId])
+  @@index([cityId])
+}
+
+// ============================================================================
+// CERTIFICERINGEN & BRANCHEVERENIGINGEN
+// ============================================================================
+
+model Certification {
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  name        String
+  description String?  @db.Text
+  iconUrl     String?
+  createdAt   DateTime @default(now())
+
+  tradespeople TradespersonCertification[]
+}
+
+model TradespersonCertification {
+  tradespersonId  String
+  certificationId String
+  validUntil      DateTime?
+
+  tradesperson  Tradesperson  @relation(fields: [tradespersonId], references: [id], onDelete: Cascade)
+  certification Certification @relation(fields: [certificationId], references: [id])
+
+  @@id([tradespersonId, certificationId])
+  @@index([certificationId])
+}
+
+model IndustryAssociation {
+  id        String   @id @default(uuid())
+  slug      String   @unique
+  name      String
+  url       String?
+  iconUrl   String?
+  createdAt DateTime @default(now())
+
+  tradespeople TradespersonAssociation[]
+}
+
+model TradespersonAssociation {
+  tradespersonId  String
+  associationId   String
+  detectionMethod String?
+
+  tradesperson Tradesperson        @relation(fields: [tradespersonId], references: [id], onDelete: Cascade)
+  association  IndustryAssociation @relation(fields: [associationId], references: [id])
+
+  @@id([tradespersonId, associationId])
+  @@index([associationId])
+}
+
+// ============================================================================
+// REVIEW BRONNEN (externe platforms)
+// ============================================================================
+
+model TradespersonReviewSource {
+  id             String       @id @default(uuid())
+  tradespersonId String
+  tradesperson   Tradesperson @relation(fields: [tradespersonId], references: [id], onDelete: Cascade)
+  platform       String
+  url            String
+  rating         Float?
+  reviewCount    Int?
+  fetchedAt      DateTime     @default(now())
+
+  @@index([tradespersonId])
+}
+
+// ============================================================================
+// PHOTOS, REVIEWS
+// ============================================================================
+
+model TradespersonPhoto {
+  id             String       @id @default(uuid())
+  tradespersonId String
+  tradesperson   Tradesperson @relation(fields: [tradespersonId], references: [id], onDelete: Cascade)
+  url            String
+  altText        String?
+  displayOrder   Int          @default(0)
+  isCover        Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+
+  @@index([tradespersonId, displayOrder])
+}
+
+model Review {
+  id                 String             @id @default(uuid())
+  tradespersonId     String
+  tradesperson       Tradesperson       @relation(fields: [tradespersonId], references: [id], onDelete: Cascade)
+  reviewerName       String
+  reviewerCity       String?
+  reviewerEmailHash  String?
+  rating             Int
+  title              String?
+  body               String             @db.Text
+  jobDate            String?
+  tradeId            String?
+  verificationMethod VerificationMethod @default(UNVERIFIED)
+  status             ReviewStatus       @default(PENDING)
+  flagged            Boolean            @default(false)
+  flagReason         String?
+  ownerResponse      String?            @db.Text
+  ownerResponseAt    DateTime?
+  ipAddressHash      String?
+  createdAt          DateTime           @default(now())
+  approvedAt         DateTime?
+
+  @@index([tradespersonId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+}
+
+enum VerificationMethod {
+  EMAIL_CONFIRMED
+  KVK_VERIFIED
+  UNVERIFIED
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ============================================================================
+// BLOG
+// ============================================================================
+
+model BlogPost {
+  id              String       @id @default(uuid())
+  slug            String       @unique
+  title           String
+  metaDescription String       @db.Text
+  excerpt         String       @db.Text
+  body            String       @db.Text
+  coverImageUrl   String?
+  coverImageAlt   String?
+  authorName      String       @default("Klushulpgids Redactie")
+  category        BlogCategory
+  relatedTradeId  String?
+  relatedTrade    Trade?       @relation(fields: [relatedTradeId], references: [id])
+  relatedCityId   String?
+  relatedCity     City?        @relation(fields: [relatedCityId], references: [id])
+  faqItems        Json?
+  howToSteps      Json?
+  publishedAt     DateTime?
+  updatedAt       DateTime     @updatedAt
+  createdAt       DateTime     @default(now())
+
+  @@index([slug])
+  @@index([publishedAt(sort: Desc)])
+  @@index([category])
+}
+
+enum BlogCategory {
+  KOSTEN
+  TIPS
+  VERDUURZAMEN
+  REGELGEVING
+  VERHALEN
+  VAKMANNEN
+  HOE_DOE_JE
+}
+
+// ============================================================================
+// USERS & AUTH (schema klaar voor fase 6, niet actief)
+// ============================================================================
+
+model User {
+  id             String    @id @default(uuid())
+  email          String    @unique
+  emailVerified  DateTime?
+  role           UserRole  @default(TRADESPERSON)
+  tradespersonId String?   @unique
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+}
+
+enum UserRole {
+  ADMIN
+  EDITOR
+  TRADESPERSON
+  CONSUMER
+}
+
+model Account {
+  id                String @id @default(uuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  user              User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============================================================================
+// ANALYTICS
+// ============================================================================
+
+model PageView {
+  id             String       @id @default(uuid())
+  tradespersonId String
+  tradesperson   Tradesperson @relation(fields: [tradespersonId], references: [id], onDelete: Cascade)
+  eventType      EventType
+  sessionHash    String?
+  createdAt      DateTime     @default(now())
+
+  @@index([tradespersonId, createdAt])
+  @@index([eventType])
+}
+
+enum EventType {
+  PROFILE_VIEW
+  PHONE_CLICK
+  EMAIL_CLICK
+  WEBSITE_CLICK
+  REVIEW_SUBMITTED
+  PHOTO_VIEW
+}
+
+// ============================================================================
+// COMPLIANCE
+// ============================================================================
+
+model OptOutBlacklist {
+  id        String   @id @default(uuid())
+  kvkNumber String?  @unique
+  emailHash String?  @unique
+  reason    String?
+  createdAt DateTime @default(now())
+}
+
+model ComplianceLog {
+  id        String   @id @default(uuid())
+  eventType String
+  metadata  Json
+  createdAt DateTime @default(now())
+
+  @@index([eventType])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// FASE 8 PLACEHOLDERS (schema klaar, monetisatie pas in fase 8)
+// ============================================================================
+
+model Payment {
+  id                String        @id @default(uuid())
+  tradespersonId    String
+  amount            Int
+  currency          String        @default("EUR")
+  status            PaymentStatus
+  provider          String
+  providerPaymentId String        @unique
+  description       String?
+  metadata          Json?
+  createdAt         DateTime      @default(now())
+  paidAt            DateTime?
+
+  @@index([tradespersonId])
+  @@index([status])
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  CANCELED
+}
+
+model Sponsorship {
+  id             String        @id @default(uuid())
+  tradespersonId String
+  cityId         String
+  tradeId        String
+  slotType       SponsorSlot
+  startDate      DateTime
+  endDate        DateTime
+  pricePerDay    Int
+  totalPrice     Int
+  status         SponsorStatus @default(PENDING)
+  impressions    Int           @default(0)
+  clicks         Int           @default(0)
+  createdAt      DateTime      @default(now())
+
+  @@index([cityId, tradeId])
+  @@index([startDate, endDate])
+  @@index([status])
+}
+
+enum SponsorSlot {
+  TOP_FEATURED
+  SIDEBAR
+  INLINE
+}
+
+enum SponsorStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+  CANCELED
+}

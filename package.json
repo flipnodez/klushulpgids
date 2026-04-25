@@ -14,10 +14,24 @@
     "type-check": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prepare": "husky"
+    "prepare": "husky",
+    "postinstall": "prisma generate",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:reset": "prisma migrate reset",
+    "db:studio": "prisma studio",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:test": "tsx scripts/test-db.ts",
+    "db:import": "tsx scripts/import-sample-data.ts"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@prisma/client": "6.19.3",
     "next": "15.5.15",
+    "prisma": "6.19.3",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "zod": "3.24.1"
@@ -32,6 +46,7 @@
     "husky": "9.1.7",
     "lint-staged": "15.3.0",
     "prettier": "3.4.2",
+    "tsx": "^4.21.0",
     "typescript": "5.7.3"
   },
   "lint-staged": {

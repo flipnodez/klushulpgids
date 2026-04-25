@@ -1,0 +1,37 @@
+# Lokale dev-omgeving (alleen voor development).
+# Productie draait op Scalingo addons (postgresql + redis).
+#
+# Start:  docker compose up -d
+# Stop:   docker compose down
+# Reset:  docker compose down -v   # ⚠ verwijdert lokale data
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: klushulpgids-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: klushulpgids
+      POSTGRES_PASSWORD: klushulpgids_dev
+      POSTGRES_DB: klushulpgids
+    ports:
+      - '5432:5432'
+    volumes:
+      - klushulpgids_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U klushulpgids -d klushulpgids']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: klushulpgids-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - klushulpgids_redisdata:/data
+
+volumes:
+  klushulpgids_pgdata:
+  klushulpgids_redisdata:

@@ -1,2 +1,2 @@
 web: node server.js
-release: ./scripts/release.sh
+release: npx prisma migrate deploy

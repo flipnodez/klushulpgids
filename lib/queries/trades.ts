@@ -60,6 +60,43 @@ export async function getTradeBySlug(slug: string): Promise<PublicTrade | null> 
 }
 
 /**
+ * Probeer een vakgebied te vinden op basis van vrije input.
+ *
+ *  1. Exacte slug match (`loodgieters` → loodgieters)
+ *  2. Match singular/plural naam (case-insensitive contains)
+ *
+ * Geeft `null` als er niets matcht. Wordt gebruikt door /zoeken om typische
+ * tikfouten op te vangen ("loodgieter" → loodgieters, "Schilder" → schilders).
+ */
+export async function resolveTradeFromInput(input: string): Promise<PublicTrade | null> {
+  const trimmed = input.trim()
+  if (trimmed.length < 2) return null
+
+  // Strategy 1: exact slug
+  const slug = trimmed
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  const direct = await prisma.trade.findUnique({ where: { slug }, select: TRADE_SELECT })
+  if (direct) return direct
+
+  // Strategy 2: contains match op singular of plural
+  return prisma.trade.findFirst({
+    where: {
+      OR: [
+        { nameSingular: { contains: trimmed, mode: 'insensitive' } },
+        { namePlural: { contains: trimmed, mode: 'insensitive' } },
+        { slug: { contains: slug } },
+      ],
+    },
+    select: TRADE_SELECT,
+    orderBy: { namePlural: 'asc' },
+  })
+}
+
+/**
  * Andere vakgebieden in dezelfde stad — voor "Andere vakmensen in Amsterdam".
  */
 export async function getRelatedTradesInCity(

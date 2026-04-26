@@ -35,6 +35,34 @@ export async function getCityBySlug(slug: string): Promise<PublicCity | null> {
   return prisma.city.findUnique({ where: { slug }, select: CITY_SELECT })
 }
 
+/**
+ * Probeer een stad te vinden op basis van vrije input. Tolerantie voor
+ * "Amsterdam", "amsterdam", "AMSTERDAM", "Den Haag" → "den-haag", etc.
+ *
+ * 1. Exacte slug match
+ * 2. Case-insensitive contains op City.name
+ */
+export async function resolveCityFromInput(input: string): Promise<PublicCity | null> {
+  const trimmed = input.trim()
+  if (trimmed.length < 2) return null
+
+  const slug = trimmed
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/['"`]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  const direct = await prisma.city.findUnique({ where: { slug }, select: CITY_SELECT })
+  if (direct) return direct
+
+  return prisma.city.findFirst({
+    where: { name: { contains: trimmed, mode: 'insensitive' } },
+    select: CITY_SELECT,
+    orderBy: { population: 'desc' },
+  })
+}
+
 export async function getCitiesByProvince(province: string): Promise<PublicCity[]> {
   return prisma.city.findMany({
     where: { province },

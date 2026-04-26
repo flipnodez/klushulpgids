@@ -109,7 +109,13 @@ function buildFilterWhere(filters?: TradespersonFilters): Prisma.TradespersonWhe
     where.availabilityStatus = { in: filters.availability }
   }
   if (filters?.minRating != null && filters.minRating > 0) {
-    where.ratingAvg = { gte: filters.minRating }
+    // Match óf eigen ratingAvg (fase 7) óf googleRating (huidige bron) ≥ minimum.
+    // Filter op alleen ratingAvg zou alle records uitsluiten omdat er nog geen
+    // eigen reviews bestaan.
+    where.OR = [
+      { ratingAvg: { gte: filters.minRating } },
+      { googleRating: { gte: filters.minRating } },
+    ]
   }
   if (filters?.specialty) {
     where.specialties = { has: filters.specialty }

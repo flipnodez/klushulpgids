@@ -7,7 +7,7 @@ import { Container } from '@/components/ui/Container'
 import { EmDashLabel } from '@/components/ui/EmDashLabel'
 import { Rule } from '@/components/ui/Rule'
 import { SearchInput } from '@/components/ui/SearchInput'
-import { getCityBySlug, getTradeBySlug, searchTradespeople } from '@/lib/queries'
+import { resolveCityFromInput, resolveTradeFromInput, searchTradespeople } from '@/lib/queries'
 import { prisma } from '@/lib/db'
 
 import styles from './page.module.css'
@@ -43,21 +43,19 @@ export default async function ZoekenPage({
   const plaatsInput = sp.plaats?.trim()
   const queryInput = sp.q?.trim()
 
-  // 1) Beide vak + plaats → probeer match en redirect
+  // 1) Beide vak + plaats → tolerante match en redirect
   if (vakInput && plaatsInput) {
-    const vakSlug = slugify(vakInput)
-    const stadSlug = slugify(plaatsInput)
-    const [trade, city] = await Promise.all([getTradeBySlug(vakSlug), getCityBySlug(stadSlug)])
+    const [trade, city] = await Promise.all([
+      resolveTradeFromInput(vakInput),
+      resolveCityFromInput(plaatsInput),
+    ])
 
-    // Beide herkend → redirect naar de directe pagina
     if (trade && city) {
       redirect(`/${trade.slug}/${city.slug}`)
     }
-    // Alleen vak herkend → redirect naar vakgebied-pagina
     if (trade && !city) {
       redirect(`/${trade.slug}`)
     }
-    // Alleen stad herkend → redirect naar stad-pagina
     if (!trade && city) {
       redirect(`/plaats/${city.slug}`)
     }
@@ -65,13 +63,13 @@ export default async function ZoekenPage({
 
   // 2) Alleen vak → redirect
   if (vakInput && !plaatsInput) {
-    const trade = await getTradeBySlug(slugify(vakInput))
+    const trade = await resolveTradeFromInput(vakInput)
     if (trade) redirect(`/${trade.slug}`)
   }
 
   // 3) Alleen plaats → redirect
   if (plaatsInput && !vakInput) {
-    const city = await getCityBySlug(slugify(plaatsInput))
+    const city = await resolveCityFromInput(plaatsInput)
     if (city) redirect(`/plaats/${city.slug}`)
   }
 

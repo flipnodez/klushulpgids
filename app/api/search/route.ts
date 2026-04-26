@@ -1,23 +1,29 @@
-import { NextResponse } from 'next/server'
-
 import { resolveCityFromInput, resolveTradeFromInput } from '@/lib/queries'
 
 /**
- * Search-resolver via Route Handler. Voert dezelfde slug-matching uit als
- * /zoeken, maar als API-route (geen page) zodat we een echte HTTP 302/307
- * redirect kunnen sturen — geen meta-refresh fallback door streaming.
+ * Search-resolver via Route Handler. Voert slug-matching uit en stuurt een
+ * echte HTTP 302 redirect — geen meta-refresh fallback (zoals bij server
+ * component `redirect()` in een page met streaming Suspense).
  *
- * Het probleem dat dit oplost: server-component `redirect()` in een page met
- * Suspense (loading.tsx) faalt over naar een meta-refresh, met een flash van
- * "loading…" voor de gebruiker. Een route handler streamt geen HTML, dus de
- * redirect is een echte HTTP-response.
+ * Belangrijk: we sturen **relatieve paden** in de Location-header, geen
+ * absolute URLs. Achter de Scalingo reverse-proxy is `request.url` de
+ * interne container-URL (https://0.0.0.0:PORT/), niet het publieke domein.
+ * Relatieve Location-headers worden door alle moderne browsers correct
+ * geresolved tegen de oorspronkelijke origin (RFC 7231).
  *
  * Flow:
  *   1. SearchInput form submit → /api/search?vak=...&plaats=...
  *   2. Resolver bekijkt input
  *   3. Match: 302 → /[vak]/[stad] of /[vak] of /plaats/[stad]
- *   4. Geen match: 302 → /zoeken?... (volledige zoek-pagina toont fuzzy results)
+ *   4. Geen match: 302 → /zoeken?... (fuzzy results-pagina)
  */
+function redirectTo(path: string): Response {
+  return new Response(null, {
+    status: 302,
+    headers: { Location: path },
+  })
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url)
   const vak = url.searchParams.get('vak')?.trim()
@@ -31,13 +37,13 @@ export async function GET(request: Request) {
       resolveCityFromInput(plaats),
     ])
     if (trade && city) {
-      return NextResponse.redirect(new URL(`/${trade.slug}/${city.slug}`, request.url), 302)
+      return redirectTo(`/${trade.slug}/${city.slug}`)
     }
     if (trade && !city) {
-      return NextResponse.redirect(new URL(`/${trade.slug}`, request.url), 302)
+      return redirectTo(`/${trade.slug}`)
     }
     if (!trade && city) {
-      return NextResponse.redirect(new URL(`/plaats/${city.slug}`, request.url), 302)
+      return redirectTo(`/plaats/${city.slug}`)
     }
   }
 
@@ -45,7 +51,7 @@ export async function GET(request: Request) {
   if (vak && !plaats) {
     const trade = await resolveTradeFromInput(vak)
     if (trade) {
-      return NextResponse.redirect(new URL(`/${trade.slug}`, request.url), 302)
+      return redirectTo(`/${trade.slug}`)
     }
   }
 
@@ -53,14 +59,15 @@ export async function GET(request: Request) {
   if (plaats && !vak) {
     const city = await resolveCityFromInput(plaats)
     if (city) {
-      return NextResponse.redirect(new URL(`/plaats/${city.slug}`, request.url), 302)
+      return redirectTo(`/plaats/${city.slug}`)
     }
   }
 
-  // Geen exacte match → naar /zoeken voor fuzzy resultaten
-  const fallback = new URL('/zoeken', request.url)
-  if (vak) fallback.searchParams.set('vak', vak)
-  if (plaats) fallback.searchParams.set('plaats', plaats)
-  if (q) fallback.searchParams.set('q', q)
-  return NextResponse.redirect(fallback, 302)
+  // Geen exacte match → /zoeken voor fuzzy results
+  const fallbackParams = new URLSearchParams()
+  if (vak) fallbackParams.set('vak', vak)
+  if (plaats) fallbackParams.set('plaats', plaats)
+  if (q) fallbackParams.set('q', q)
+  const queryString = fallbackParams.toString()
+  return redirectTo(queryString ? `/zoeken?${queryString}` : '/zoeken')
 }

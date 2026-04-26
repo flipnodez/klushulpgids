@@ -16,9 +16,22 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import process from 'node:process'
 
-const SOURCE_PATH = resolve(process.cwd(), 'vakbedrijven_merged_enriched_openai_clean_qc.json')
-const OUTPUT_PATH = resolve(process.cwd(), 'prisma/seed-data/sample-tradespeople.json')
-const ARCHIVE_PATH = resolve(process.cwd(), 'data-archive/needs-categorie-classification.json')
+// CLI: --in=<path> en --out=<path> overrulen de defaults.
+function parseArgs() {
+  const args = process.argv.slice(2)
+  let inPath = resolve(process.cwd(), 'vakbedrijven_merged_enriched_openai_clean_qc.json')
+  let outPath = resolve(process.cwd(), 'prisma/seed-data/sample-tradespeople.json')
+  let archivePath = resolve(process.cwd(), 'data-archive/needs-categorie-classification.json')
+  for (const a of args) {
+    if (a.startsWith('--in=')) inPath = resolve(process.cwd(), a.slice('--in='.length))
+    else if (a.startsWith('--out=')) outPath = resolve(process.cwd(), a.slice('--out='.length))
+    else if (a.startsWith('--archive='))
+      archivePath = resolve(process.cwd(), a.slice('--archive='.length))
+  }
+  return { inPath, outPath, archivePath }
+}
+
+const { inPath: SOURCE_PATH, outPath: OUTPUT_PATH, archivePath: ARCHIVE_PATH } = parseArgs()
 
 // 40+ LLM-categorieën → 12 vakgebieden. None = SKIP.
 const CATEGORIE_MAP: Record<string, string | null> = {
@@ -120,6 +133,12 @@ function splitCompound(value: string | undefined): string[] {
     .filter(Boolean)
 }
 
+// Delta-only fallback: records zonder LLM-categorie krijgen via _import_reason
+// alsnog een vakgebied (alleen waar de bron 100% gespecialiseerd is).
+const IMPORT_REASON_FALLBACK: Record<string, string> = {
+  recovered_groenkeur: 'hoveniers', // Groenkeur = keurmerk groenvoorziening
+}
+
 function mapToVakgebied(rec: RawRecord): { slug: string | null; reason: string } {
   if (rec.relevantie === 'niet_relevant') return { slug: null, reason: 'niet_relevant' }
   if (rec.bruikbaar === false) return { slug: null, reason: 'bruikbaar_false' }
@@ -127,7 +146,6 @@ function mapToVakgebied(rec: RawRecord): { slug: string | null; reason: string }
   if (!rec.bedrijfsnaam) return { slug: null, reason: 'no_company_name' }
 
   const candidates = [...splitCompound(rec.categorie), ...splitCompound(rec.categorie_uit_bron)]
-  if (candidates.length === 0) return { slug: null, reason: 'no_categorie' }
 
   for (const cat of candidates) {
     if (cat in CATEGORIE_MAP) {
@@ -136,6 +154,15 @@ function mapToVakgebied(rec: RawRecord): { slug: string | null; reason: string }
       return { slug: mapped, reason: `mapped:${cat}` }
     }
   }
+
+  // Fallback voor delta-records met bekende _import_reason
+  const importReason = (rec as Record<string, unknown>)._import_reason
+  if (typeof importReason === 'string' && importReason in IMPORT_REASON_FALLBACK) {
+    const slug = IMPORT_REASON_FALLBACK[importReason]!
+    return { slug, reason: `import_reason_fallback:${importReason}` }
+  }
+
+  if (candidates.length === 0) return { slug: null, reason: 'no_categorie' }
   return { slug: null, reason: `unmapped:${candidates[0] ?? 'unknown'}` }
 }
 
@@ -157,14 +184,16 @@ function trim(rec: RawRecord, vakgebied: string): Record<string, unknown> {
   // Beschrijving: 400 chars max
   const beschr = typeof rec.beschrijving === 'string' ? rec.beschrijving.slice(0, 400) : null
 
-  // _meta: alleen kvk + btw + source
+  // _meta: alleen kvk + btw + source. KvK/BTW kunnen op top-level (delta-bestanden)
+  // OF nested onder _meta (eerste enrichment-batch) zitten — pak waar 't ook is.
   const m = (rec._meta ?? {}) as Record<string, unknown>
+  const r = rec as Record<string, unknown>
   const meta = pruneEmpty({
     _source: m._source,
     _source_id: m._source_id,
     _fetched_at: m._fetched_at,
-    kvk_nummer: m.kvk_nummer,
-    btw_nummer: m.btw_nummer,
+    kvk_nummer: r.kvk_nummer ?? m.kvk_nummer,
+    btw_nummer: r.btw_nummer ?? m.btw_nummer,
   })
 
   // Cap arrays op redelijke maxima

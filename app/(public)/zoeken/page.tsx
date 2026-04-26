@@ -113,7 +113,7 @@ export default async function ZoekenPage({
           )}
         </h1>
         <div className={styles.searchWrap}>
-          <SearchInput initialVak={vakInput} initialPlaats={plaatsInput} action="/zoeken" />
+          <SearchInput initialVak={vakInput} initialPlaats={plaatsInput} action="/api/search" />
         </div>
       </header>
 

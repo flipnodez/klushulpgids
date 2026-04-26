@@ -68,7 +68,7 @@ export default async function HomePage() {
             gegevens, certificeringen en eerlijke beoordelingen.
           </p>
           <div className={styles.searchWrap}>
-            <SearchInput action="/zoeken" />
+            <SearchInput action="/api/search" />
           </div>
         </article>
       </Container>

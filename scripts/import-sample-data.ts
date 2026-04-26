@@ -1,229 +1,121 @@
 /**
- * Import-script voor scraped vakbedrijven-data.
+ * Import-script voor gecureerde vakmensen-dataset.
  *
- * Bron-default: prisma/seed-data/sample-tradespeople.json (2100 records, ~3.5MB,
- * gecureerd uit alle 7 bronnen — staat in deploy). Fallback voor lokale full
- * import: vakbedrijven_merged.json (11K records, niet in deploy).
+ * Bron-default: `prisma/seed-data/sample-tradespeople.json` — gegenereerd
+ * door `scripts/prepare-seed-data.ts` uit de enrichment-pipeline output.
+ * Records hebben al een `_vakgebied` veld (één van de 12 slugs) en quality-
+ * flags zoals `review_nodig`, `tel_invalide`, `email_dns_invalide`,
+ * `email_website_mismatch`, `website_status`, `vertrouwensscore`.
  *
  * Strategie:
- *  - Idempotent: re-runnen overschrijft niet, maar update bestaande records
- *    op (kvkNumber OR (sourceName, sourceId)).
- *  - Email versleuteld via lib/encryption.ts; emailHash voor lookup.
- *  - Trades gematcht via zoekterm + SBI-codes + source-fallback.
- *  - Cities op exacte slug-match; onbekende cities → cityId=null.
- *  - Quality score 0-100 per criteria in phase-2-database.md §2.7.
+ *  - --replace: TRUNCATE Tradesperson + relaties vóór import (DEFAULT bij
+ *    nieuwe seed-data om stale records weg te halen). Trade/City zaden
+ *    blijven bestaan.
+ *  - --append: alleen upsert (idempotent), geen truncate.
+ *  - Email AES-encrypted via lib/encryption.ts; emailHash voor dedup.
+ *  - Quality-flags worden Tradesperson kolommen.
+ *  - Brancheverenigingen + certificeringen blijven upsert + pivot link.
  *
  * Run:
- *   npx tsx scripts/import-sample-data.ts                              # default = curated subset
- *   npx tsx scripts/import-sample-data.ts --file=vakbedrijven_merged.json  # full set (lokaal)
- *   npx tsx scripts/import-sample-data.ts --limit=200                  # stop na N records
- *   npx tsx scripts/import-sample-data.ts --dry-run                    # geen DB-writes
+ *   npx tsx scripts/import-sample-data.ts                       # default = curated subset, --replace
+ *   npx tsx scripts/import-sample-data.ts --append               # alleen toevoegen, geen truncate
+ *   npx tsx scripts/import-sample-data.ts --limit=200            # eerste N records
+ *   npx tsx scripts/import-sample-data.ts --file=foo.json        # ander bestand
+ *   npx tsx scripts/import-sample-data.ts --dry-run              # geen DB-writes
  */
 
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
 
-import { Prisma, PrismaClient, type AvailabilityStatus, type MarketFocus } from '@prisma/client'
+import {
+  Prisma,
+  PrismaClient,
+  type AvailabilityStatus,
+  type MarketFocus,
+  type TeamSize,
+} from '@prisma/client'
 
 import { encrypt, hashEmail } from '../lib/encryption'
 
 const prisma = new PrismaClient({ log: ['error', 'warn'] })
 
 // ============================================================================
-// Type voor één raw record uit de JSON
+// Type van één gecureerd record (output van prepare-seed-data.ts)
 // ============================================================================
 
-type RawRecord = {
-  bedrijfsnaam?: string
+type CuratedRecord = {
+  bedrijfsnaam: string
   plaats?: string
+  gemeente?: string
+  provincie?: string
   straat?: string
-  adres?: string
   postcode?: string
+  latitude?: number
+  longitude?: number
   email?: string
   telefoonnummer?: string
   website?: string
-  beschrijving?: string
+  beschrijving?: string | null
   marktfocus?: string
   certificeringen?: string[]
   brancheverenigingen?: string[]
-  branchevereniging?: string
   specialisaties?: string[]
+  diensten_lijst?: string[]
+  unique_selling_points?: string[]
+  talen?: string[]
+  werkgebied?: string[]
+  doelgroep?: string
+  team_omvang?: string | number
+  spoeddienst?: boolean
+  offerte_gratis?: boolean
   social_media?: Record<string, unknown>
   google_reviews_count?: number
   google_reviews_score?: number
   google_place_id?: string
   review_url?: string
   review_bronnen?: Array<{ url?: string; bron?: string; rating?: number; aantal?: number }>
-  zoekterm?: string
+  logo_url?: string
   sbi_codes?: Array<{ sbi_code?: string; sbi_naam?: string; score?: number; keywords?: string[] }>
-  enrichment?: {
+  relevantie?: string
+  review_nodig?: boolean
+  tel_invalide?: boolean
+  email_dns_invalide?: boolean
+  email_website_mismatch?: boolean
+  website_status?: string
+  vertrouwensscore?: number
+  bruikbaar?: boolean | null
+  _meta?: {
+    _source?: string
+    _source_id?: string
+    _sources?: string[]
+    _source_ids?: string[]
+    _fetched_at?: string
     kvk_nummer?: string
     btw_nummer?: string
-    beschrijving?: string
+    [k: string]: unknown
   }
-  relevantie?: string
-  _source?: string
-  _source_id?: string
-  _sources?: string[]
-  _source_ids?: string[]
-  _fetched_at?: string
+  _vakgebied: string // Komt uit prepare-seed-data, vereist
 }
 
 // ============================================================================
 // CLI flags
 // ============================================================================
 
-import { existsSync } from 'node:fs'
-
-/**
- * Default bron: gecureerde subset (`prisma/seed-data/sample-tradespeople.json`,
- * 2100 records, ~3.5MB) die in de Scalingo deploy meegaat. Lokaal kun je met
- * `--file=vakbedrijven_merged.json` de volledige 11K-set draaien.
- */
 function parseArgs() {
   const args = process.argv.slice(2)
-  const curatedPath = 'prisma/seed-data/sample-tradespeople.json'
-  const fullPath = 'vakbedrijven_merged.json'
-  let file = existsSync(curatedPath) ? curatedPath : fullPath
+  const curated = 'prisma/seed-data/sample-tradespeople.json'
+  let file = existsSync(curated) ? curated : 'vakbedrijven_merged.json'
   let limit: number | null = null
   let dryRun = false
+  let append = false
   for (const a of args) {
     if (a.startsWith('--file=')) file = a.slice('--file='.length)
     else if (a.startsWith('--limit=')) limit = Number.parseInt(a.slice('--limit='.length), 10)
     else if (a === '--dry-run') dryRun = true
+    else if (a === '--append') append = true
   }
-  return { file, limit, dryRun }
-}
-
-// ============================================================================
-// Trade matching: zoekterm + SBI → trade slug
-// ============================================================================
-
-const ZOEKTERM_TO_TRADE: Array<[RegExp, string]> = [
-  [/^loodgieter/i, 'loodgieters'],
-  [/^elektr/i, 'elektriciens'],
-  [/^schilder/i, 'schilders'],
-  [/^stukad/i, 'stukadoors'],
-  [/^tegel/i, 'tegelzetters'],
-  [/^timmer/i, 'timmerlieden'],
-  [/^dakdekker|^dak\b/i, 'dakdekkers'],
-  [/^hovenier/i, 'hoveniers'],
-  [/^klus/i, 'klusbedrijven'],
-  [/^cv\b|warmtepomp/i, 'cv-monteurs'],
-  [/^glaszetter|^glas\b/i, 'glaszetters'],
-  [/^vloer|parket/i, 'vloerenleggers'],
-  [/^installat/i, 'klusbedrijven'], // generieke installatie → klusbedrijven (fallback)
-]
-
-const SBI_TO_TRADE: Record<string, string> = {
-  '4321': 'elektriciens',
-  '4322': 'loodgieters',
-  '4322.1': 'cv-monteurs',
-  '4322.2': 'loodgieters',
-  '4329': 'klusbedrijven',
-  '4331': 'stukadoors',
-  '4332': 'timmerlieden',
-  '4333': 'tegelzetters',
-  '4334': 'schilders',
-  '4339': 'klusbedrijven',
-  '4391': 'dakdekkers',
-  '4399': 'klusbedrijven',
-  '8130': 'hoveniers',
-  '81300': 'hoveniers',
-}
-
-// Brancheverenigingen / certificerende bronnen → trade fallback wanneer
-// geen zoekterm of SBI beschikbaar is. Pure heuristiek; vakman kan dit later
-// zelf corrigeren via dashboard (fase 6).
-const SOURCE_TO_TRADE: Record<string, string> = {
-  bouwendnederland: 'klusbedrijven', // generieke bouwsector
-  bouwgarant: 'klusbedrijven',
-  onderhoudnl: 'klusbedrijven', // onderhoudsbedrijven
-  vlok: 'loodgieters', // Verbond Loodgieters Onderhoud Klimaat
-  nvkl: 'cv-monteurs', // Koel- en luchtbehandelingstechniek
-  groenkeur: 'hoveniers',
-  technieknl: 'klusbedrijven', // fallback enkel als zoekterm/SBI ontbreken
-}
-
-function matchTrades(
-  rec: RawRecord,
-  tradeSlugById: Map<string, string>,
-): {
-  primary: string | null
-  all: Array<{
-    slug: string
-    sbiCode?: string
-    sbiName?: string
-    sbiScore?: number
-    isPrimary: boolean
-  }>
-} {
-  const matches = new Map<
-    string,
-    { sbiCode?: string; sbiName?: string; sbiScore?: number; isPrimary: boolean }
-  >()
-
-  // 1. Zoekterm → primary trade
-  let primary: string | null = null
-  if (rec.zoekterm) {
-    for (const [re, slug] of ZOEKTERM_TO_TRADE) {
-      if (re.test(rec.zoekterm)) {
-        primary = slug
-        matches.set(slug, { isPrimary: true })
-        break
-      }
-    }
-  }
-
-  // 2. SBI codes → additional trades (sorted by score desc)
-  if (Array.isArray(rec.sbi_codes)) {
-    const sorted = [...rec.sbi_codes].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-    for (const sbi of sorted) {
-      const code = sbi.sbi_code
-      if (!code) continue
-      // Try exact match first, then prefix (4322.1 → 4322)
-      const slug = SBI_TO_TRADE[code] ?? SBI_TO_TRADE[code.split('.')[0] ?? '']
-      if (!slug) continue
-      if (!matches.has(slug)) {
-        matches.set(slug, {
-          sbiCode: code,
-          sbiName: sbi.sbi_naam,
-          sbiScore: sbi.score,
-          isPrimary: !primary,
-        })
-        if (!primary) primary = slug
-      } else {
-        // Update SBI metadata on existing match
-        const m = matches.get(slug)!
-        if (!m.sbiCode) {
-          m.sbiCode = code
-          m.sbiName = sbi.sbi_naam
-          m.sbiScore = sbi.score
-        }
-      }
-    }
-  }
-
-  // 3. Source-based fallback wanneer zoekterm + SBI niets opleverden
-  if (matches.size === 0) {
-    const sources = rec._sources ?? (rec._source ? [rec._source] : [])
-    for (const src of sources) {
-      const slug = SOURCE_TO_TRADE[src]
-      if (slug && tradeSlugById.has(slug)) {
-        primary = slug
-        matches.set(slug, { isPrimary: true })
-        break
-      }
-    }
-  }
-
-  // 4. Filter: alleen trades die we kennen
-  const all = [...matches.entries()]
-    .filter(([slug]) => tradeSlugById.has(slug))
-    .map(([slug, meta]) => ({ slug, ...meta }))
-
-  return { primary: primary && tradeSlugById.has(primary) ? primary : null, all }
+  return { file, limit, dryRun, append }
 }
 
 // ============================================================================
@@ -234,7 +126,7 @@ function slugify(input: string): string {
   return input
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '') // strip accents
+    .replace(/[̀-ͯ]/g, '')
     .replace(/['"`]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
@@ -254,27 +146,48 @@ function mapMarketFocus(value: string | undefined): MarketFocus | null {
   return null
 }
 
-function inferAvailability(_rec: RawRecord): AvailabilityStatus {
+function mapTeamSize(input: string | number | undefined): TeamSize | null {
+  if (input == null) return null
+  const s = String(input).toLowerCase()
+  // Numeric: parse direct
+  const n = Number.parseInt(s, 10)
+  if (!Number.isNaN(n)) {
+    if (n <= 1) return 'SOLO'
+    if (n <= 4) return 'SMALL'
+    if (n <= 10) return 'MEDIUM'
+    return 'LARGE'
+  }
+  // Tekst-hints
+  if (s.includes('zzp') || s.includes('eenmans') || s === 'solo') return 'SOLO'
+  if (/2-4|2 tot 4|klein/i.test(s)) return 'SMALL'
+  if (/5-10|middelgroot|medium/i.test(s)) return 'MEDIUM'
+  if (/groot|10\+|large/i.test(s)) return 'LARGE'
+  return null
+}
+
+function inferAvailability(_rec: CuratedRecord): AvailabilityStatus {
   // Geen explicit availability in scrape data — alle import krijgt UNKNOWN.
   // Vakman update dit zelf in fase 6 dashboard.
   return 'UNKNOWN'
 }
 
-function calcQualityScore(rec: RawRecord): number {
+function calcQualityScore(rec: CuratedRecord): number {
   let score = 0
-  if (rec.enrichment?.kvk_nummer) score += 20
-  const desc = rec.beschrijving ?? rec.enrichment?.beschrijving ?? ''
+  if (rec._meta?.kvk_nummer) score += 20
+  const desc = rec.beschrijving ?? ''
   if (desc.length > 100) score += 10
   if (rec.telefoonnummer) score += 10
   if (rec.website) score += 10
   if (rec.email) score += 10
-  if (Array.isArray(rec.certificeringen) && rec.certificeringen.length > 0) score += 15
-  const associations =
-    rec.brancheverenigingen ?? (rec.branchevereniging ? [rec.branchevereniging] : [])
-  if (associations.length > 0) score += 10
+  if ((rec.certificeringen ?? []).length > 0) score += 15
+  if ((rec.brancheverenigingen ?? []).length > 0) score += 10
   if ((rec.google_reviews_count ?? 0) > 5) score += 10
-  if (Array.isArray(rec.specialisaties) && rec.specialisaties.length > 0) score += 5
-  return Math.min(score, 100)
+  if ((rec.specialisaties ?? []).length > 0) score += 5
+  // Aftrek voor data-issues
+  if (rec.tel_invalide) score -= 5
+  if (rec.email_dns_invalide) score -= 5
+  if (rec.website_status && rec.website_status !== 'ok') score -= 5
+  return Math.max(0, Math.min(score, 100))
 }
 
 function uniqueSlug(used: Set<string>, base: string): string {
@@ -291,15 +204,35 @@ function uniqueSlug(used: Set<string>, base: string): string {
   return slug
 }
 
-function parseAddress(rec: RawRecord): { street?: string; houseNumber?: string } {
-  // "Past. van Haarenstraat 13" → street + houseNumber
-  const src = rec.straat?.trim() || rec.adres?.split(',')[0]?.trim()
+function toFloat(value: unknown): number | null {
+  if (value == null || value === '') return null
+  const n = typeof value === 'number' ? value : Number.parseFloat(String(value))
+  return Number.isFinite(n) ? n : null
+}
+
+function parseAddress(rec: CuratedRecord): { street?: string; houseNumber?: string } {
+  const src = rec.straat?.trim()
   if (!src) return {}
-  const m = src.match(/^(.*?)\s+(\d+\s*[a-zA-Z]?)\s*$/)
-  if (m) {
-    return { street: m[1]?.trim(), houseNumber: m[2]?.replace(/\s/g, '') }
-  }
+  const m = src.match(/^(.*?)\s+(\d+\s*[a-zA-Z-]?\s*\d*)\s*$/)
+  if (m) return { street: m[1]?.trim(), houseNumber: m[2]?.replace(/\s/g, '') }
   return { street: src }
+}
+
+function buildEnrichmentMeta(rec: CuratedRecord): Prisma.InputJsonValue | typeof Prisma.JsonNull {
+  const meta: Record<string, unknown> = {}
+  if (rec.diensten_lijst?.length) meta.diensten = rec.diensten_lijst
+  if (rec.unique_selling_points?.length) meta.uniqueSellingPoints = rec.unique_selling_points
+  if (rec.talen?.length) meta.talen = rec.talen
+  if (rec.werkgebied?.length) meta.werkgebied = rec.werkgebied
+  if (rec.doelgroep) meta.doelgroep = rec.doelgroep
+  if (rec.team_omvang != null) meta.teamOmvang = rec.team_omvang
+  if (rec.offerte_gratis != null) meta.offerteGratis = rec.offerte_gratis
+  if (rec.gemeente) meta.gemeente = rec.gemeente
+  if (rec.provincie) meta.provincie = rec.provincie
+  if (rec.logo_url) meta.logoUrl = rec.logo_url
+  if (rec.google_place_id) meta.googlePlaceId = rec.google_place_id
+  if (rec._meta?.btw_nummer) meta.btw = rec._meta.btw_nummer
+  return Object.keys(meta).length === 0 ? Prisma.JsonNull : (meta as Prisma.InputJsonValue)
 }
 
 // ============================================================================
@@ -309,7 +242,6 @@ function parseAddress(rec: RawRecord): { street?: string; houseNumber?: string }
 const stats = {
   total: 0,
   imported: 0,
-  updated: 0,
   skipped: 0,
   errors: 0,
   noCityMatch: 0,
@@ -326,29 +258,46 @@ function noteReason(reason: string) {
 // ============================================================================
 
 async function main() {
-  const { file, limit, dryRun } = parseArgs()
+  const { file, limit, dryRun, append } = parseArgs()
   const filePath = resolve(process.cwd(), file)
   console.log(`📂 Reading ${filePath}…`)
   const raw = readFileSync(filePath, 'utf8')
-  const records: RawRecord[] = JSON.parse(raw)
+  const records: CuratedRecord[] = JSON.parse(raw)
   console.log(`📊 ${records.length} records loaded`)
   if (limit) console.log(`   Limit: ${limit}`)
   if (dryRun) console.log(`   ⚠ DRY RUN — geen DB-writes`)
+  if (append) console.log(`   Mode: APPEND (geen truncate)`)
+  else console.log(`   Mode: REPLACE (truncate Tradesperson eerst)`)
 
   // Pre-load lookup maps
   const trades = await prisma.trade.findMany({ select: { id: true, slug: true } })
   const tradeIdBySlug = new Map(trades.map((t) => [t.slug, t.id]))
-  const tradeSlugById = new Map(trades.map((t) => [t.slug, t.slug]))
   console.log(`🛠️  ${trades.length} trades cached`)
 
   const cities = await prisma.city.findMany({ select: { id: true, slug: true } })
   const cityIdBySlug = new Map(cities.map((c) => [c.slug, c.id]))
   console.log(`🏙️  ${cities.length} cities cached`)
 
-  // Track existing slugs voor uniciteit
-  const existingSlugs = new Set(
-    (await prisma.tradesperson.findMany({ select: { slug: true } })).map((t) => t.slug),
-  )
+  // TRUNCATE tabellen die per import vervangen mogen worden
+  if (!append && !dryRun) {
+    console.log(`\n🧹 Truncating Tradesperson + relaties…`)
+    await prisma.$executeRaw`
+      TRUNCATE TABLE
+        "Tradesperson",
+        "TradespersonTrade",
+        "TradespersonServiceArea",
+        "TradespersonCertification",
+        "TradespersonAssociation",
+        "TradespersonReviewSource",
+        "TradespersonPhoto",
+        "Review",
+        "PageView"
+      RESTART IDENTITY CASCADE
+    `
+    console.log(`   ✓ Tabellen geleegd (Trade/City/Certification/IndustryAssociation blijven)`)
+  }
+
+  const existingSlugs = new Set<string>()
 
   const toProcess = limit ? records.slice(0, limit) : records
   stats.total = toProcess.length
@@ -358,7 +307,7 @@ async function main() {
   for (let i = 0; i < toProcess.length; i++) {
     const rec = toProcess[i]!
     try {
-      await importOne(rec, { tradeIdBySlug, tradeSlugById, cityIdBySlug, existingSlugs, dryRun })
+      await importOne(rec, { tradeIdBySlug, cityIdBySlug, existingSlugs, dryRun, append })
     } catch (err) {
       stats.errors++
       const msg = err instanceof Error ? err.message : String(err)
@@ -372,7 +321,7 @@ async function main() {
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
       const rate = ((i + 1) / Number(elapsed)).toFixed(0)
       console.log(
-        `  ${i + 1}/${toProcess.length}  imp=${stats.imported}  upd=${stats.updated}  skip=${stats.skipped}  err=${stats.errors}  (${elapsed}s, ${rate}/s)`,
+        `  ${i + 1}/${toProcess.length}  imp=${stats.imported}  skip=${stats.skipped}  err=${stats.errors}  (${elapsed}s, ${rate}/s)`,
       )
     }
   }
@@ -380,18 +329,30 @@ async function main() {
   // Final report
   console.log('\n────────────────────────────────────────')
   console.log(`✅ Total processed:    ${stats.total}`)
-  console.log(`   Imported (new):     ${stats.imported}`)
-  console.log(`   Updated:            ${stats.updated}`)
+  console.log(`   Imported:           ${stats.imported}`)
   console.log(`   Skipped:            ${stats.skipped}`)
   console.log(`   Errors:             ${stats.errors}`)
-  console.log(`   No city match:      ${stats.noCityMatch}  (cityId set to NULL)`)
+  console.log(`   No city match:      ${stats.noCityMatch}  (cityId=NULL)`)
   console.log(`   No trade match:     ${stats.noTradeMatch}`)
 
   if (stats.reasons.size > 0) {
-    console.log('\n   Skip/error reasons:')
+    console.log('\n   Skip/error redenen:')
     const sorted = [...stats.reasons.entries()].sort((a, b) => b[1] - a[1])
     for (const [reason, count] of sorted.slice(0, 10)) {
       console.log(`     ${count.toString().padStart(5)}  ${reason}`)
+    }
+  }
+
+  // Counts per vakgebied
+  if (!dryRun) {
+    const byTrade = await prisma.tradespersonTrade.groupBy({
+      by: ['tradeId'],
+      _count: true,
+    })
+    const tradeNames = new Map(trades.map((t) => [t.id, t.slug]))
+    console.log(`\n   Per vakgebied:`)
+    for (const row of byTrade.sort((a, b) => b._count - a._count)) {
+      console.log(`     ${(tradeNames.get(row.tradeId) ?? row.tradeId).padEnd(18)} ${row._count}`)
     }
   }
 
@@ -403,13 +364,13 @@ async function main() {
 // ============================================================================
 
 async function importOne(
-  rec: RawRecord,
+  rec: CuratedRecord,
   ctx: {
     tradeIdBySlug: Map<string, string>
-    tradeSlugById: Map<string, string>
     cityIdBySlug: Map<string, string>
     existingSlugs: Set<string>
     dryRun: boolean
+    append: boolean
   },
 ) {
   const companyName = rec.bedrijfsnaam?.trim()
@@ -419,19 +380,14 @@ async function importOne(
     return
   }
 
-  const sourceName = rec._source ?? rec._sources?.[0]
-  const sourceId = rec._source_id ?? rec._source_ids?.[0]
-  if (!sourceName || !sourceId) {
-    stats.skipped++
-    noteReason('no source identifier')
-    return
-  }
+  const sourceName = rec._meta?._source ?? rec._meta?._sources?.[0]
+  const sourceId = rec._meta?._source_id ?? rec._meta?._source_ids?.[0]
 
-  // Match trade
-  const tradeMatch = matchTrades(rec, ctx.tradeSlugById)
-  if (tradeMatch.all.length === 0) {
+  // Match trade — _vakgebied is gegarandeerd uit prepare-seed-data
+  const tradeId = ctx.tradeIdBySlug.get(rec._vakgebied)
+  if (!tradeId) {
     stats.noTradeMatch++
-    // Niet skippen — record blijft, alleen geen trade-link
+    noteReason(`unknown_vakgebied:${rec._vakgebied}`)
   }
 
   // Match city
@@ -445,8 +401,8 @@ async function importOne(
   }
 
   // KvK & lookup
-  const kvk = rec.enrichment?.kvk_nummer?.replace(/\s/g, '') || null
-  const btw = rec.enrichment?.btw_nummer || null
+  const kvk = rec._meta?.kvk_nummer?.replace(/\s/g, '') || null
+  const btw = rec._meta?.btw_nummer || null
 
   // Email + hash
   let emailEnc: string | null = null
@@ -459,21 +415,22 @@ async function importOne(
     }
   }
 
-  // Find existing record (idempotency)
-  const existing = kvk
-    ? await prisma.tradesperson.findUnique({ where: { kvkNumber: kvk } })
-    : await prisma.tradesperson.findFirst({
-        where: { sourceName, sourceId },
-      })
+  // Find existing (alleen relevant in --append mode; in --replace is alles leeg)
+  const existing =
+    ctx.append && (kvk || (sourceName && sourceId))
+      ? kvk
+        ? await prisma.tradesperson.findUnique({ where: { kvkNumber: kvk } })
+        : await prisma.tradesperson.findFirst({ where: { sourceName, sourceId } })
+      : null
 
-  // Build data payload
-  const description = (rec.beschrijving ?? rec.enrichment?.beschrijving ?? '')?.slice(0, 5000)
+  const description = rec.beschrijving?.slice(0, 5000) ?? null
   const { street, houseNumber } = parseAddress(rec)
+
   const data = {
     companyName,
     kvkNumber: kvk,
     btwNumber: btw,
-    description: description || null,
+    description,
     email: emailEnc,
     emailHash,
     phone: rec.telefoonnummer || null,
@@ -483,22 +440,33 @@ async function importOne(
     houseNumber,
     postalCode: rec.postcode || null,
     cityId,
+    latitude: toFloat(rec.latitude),
+    longitude: toFloat(rec.longitude),
     marketFocus: mapMarketFocus(rec.marktfocus),
+    teamSize: mapTeamSize(rec.team_omvang),
+    emergencyService: rec.spoeddienst === true,
     availabilityStatus: inferAvailability(rec),
-    specialties: Array.isArray(rec.specialisaties) ? rec.specialisaties : [],
+    specialties: rec.specialisaties ?? [],
     googleRating: rec.google_reviews_score ?? null,
     googleReviewsCount: rec.google_reviews_count ?? null,
     qualityScore: calcQualityScore(rec),
-    sourcesUsed: rec._sources ?? (rec._source ? [rec._source] : []),
-    sourceId,
-    sourceName,
-    privacySensitive: rec.relevantie === 'niet_relevant', // soft flag
-    scrapedAt: rec._fetched_at ? new Date(rec._fetched_at) : null,
+    sourcesUsed: rec._meta?._sources ?? (rec._meta?._source ? [rec._meta._source] : []),
+    sourceId: sourceId ?? null,
+    sourceName: sourceName ?? null,
+    privacySensitive: rec.relevantie === 'niet_relevant',
+    scrapedAt: rec._meta?._fetched_at ? new Date(rec._meta._fetched_at) : null,
+    // Quality flags
+    reviewNeeded: rec.review_nodig === true,
+    phoneInvalid: rec.tel_invalide === true,
+    emailDnsInvalid: rec.email_dns_invalide === true,
+    emailWebsiteMismatch: rec.email_website_mismatch === true,
+    websiteStatus: rec.website_status ?? null,
+    trustScore: rec.vertrouwensscore ?? null,
+    enrichmentMeta: buildEnrichmentMeta(rec),
   }
 
   if (ctx.dryRun) {
-    if (existing) stats.updated++
-    else stats.imported++
+    stats.imported++
     return
   }
 
@@ -508,17 +476,15 @@ async function importOne(
       where: { id: existing.id },
       data,
     })
-    stats.updated++
   } else {
     const baseSlug = slugify(companyName)
-    const slug = uniqueSlug(ctx.existingSlugs, baseSlug || `bedrijf-${sourceId}`)
+    const slug = uniqueSlug(ctx.existingSlugs, baseSlug || `bedrijf-${sourceId ?? Date.now()}`)
     try {
       tradesperson = await prisma.tradesperson.create({
         data: { ...data, slug },
       })
     } catch (err) {
-      // Duplicaat emailHash: andere vakman heeft al dit email-adres geregistreerd.
-      // Retry zonder email — vakman kan later via dashboard claimen.
+      // Duplicaat emailHash → retry zonder email
       if (err instanceof Error && err.message.includes('emailHash')) {
         noteReason('emailHash collision — saved without email')
         tradesperson = await prisma.tradesperson.create({
@@ -528,64 +494,53 @@ async function importOne(
         throw err
       }
     }
-    stats.imported++
+  }
+  stats.imported++
+
+  // Trade pivot
+  if (tradeId) {
+    await prisma.tradespersonTrade.upsert({
+      where: {
+        tradespersonId_tradeId: { tradespersonId: tradesperson.id, tradeId },
+      },
+      create: {
+        tradespersonId: tradesperson.id,
+        tradeId,
+        isPrimary: true,
+      },
+      update: { isPrimary: true },
+    })
   }
 
-  // ── Trades (TradespersonTrade pivot) ────────────────────────────────────
-  if (tradeMatch.all.length > 0) {
-    // Wis bestaande pivots en herinsert (idempotent + cleanup oude matches)
-    await prisma.tradespersonTrade.deleteMany({ where: { tradespersonId: tradesperson.id } })
-    for (const m of tradeMatch.all) {
-      const tradeId = ctx.tradeIdBySlug.get(m.slug)
-      if (!tradeId) continue
-      await prisma.tradespersonTrade.create({
-        data: {
+  // Certificaties
+  for (const certName of rec.certificeringen ?? []) {
+    const trimmed = certName?.trim()
+    if (!trimmed) continue
+    const shortName = trimmed
+      .split(/[—:.,(]/)[0]!
+      .trim()
+      .slice(0, 100)
+    const slug = slugify(shortName)
+    if (!slug) continue
+    const cert = await prisma.certification.upsert({
+      where: { slug },
+      create: { slug, name: shortName, description: trimmed },
+      update: {},
+    })
+    await prisma.tradespersonCertification.upsert({
+      where: {
+        tradespersonId_certificationId: {
           tradespersonId: tradesperson.id,
-          tradeId,
-          isPrimary: m.isPrimary,
-          sbiCode: m.sbiCode ?? null,
-          sbiName: m.sbiName ?? null,
-          sbiScore: m.sbiScore ?? null,
+          certificationId: cert.id,
         },
-      })
-    }
+      },
+      create: { tradespersonId: tradesperson.id, certificationId: cert.id },
+      update: {},
+    })
   }
 
-  // ── Certificaties ────────────────────────────────────────────────────────
-  if (Array.isArray(rec.certificeringen) && rec.certificeringen.length > 0) {
-    for (const certName of rec.certificeringen) {
-      const trimmed = certName?.trim()
-      if (!trimmed) continue
-      // Naam kan heel lang zijn ("CO-Keur Deelnemer van dienstverlener…");
-      // pak eerste 4 woorden voor naam, hele string als description.
-      const shortName = trimmed
-        .split(/[—:.,(]/)[0]!
-        .trim()
-        .slice(0, 100)
-      const slug = slugify(shortName)
-      if (!slug) continue
-      const cert = await prisma.certification.upsert({
-        where: { slug },
-        create: { slug, name: shortName, description: trimmed },
-        update: {},
-      })
-      await prisma.tradespersonCertification.upsert({
-        where: {
-          tradespersonId_certificationId: {
-            tradespersonId: tradesperson.id,
-            certificationId: cert.id,
-          },
-        },
-        create: { tradespersonId: tradesperson.id, certificationId: cert.id },
-        update: {},
-      })
-    }
-  }
-
-  // ── Brancheverenigingen ──────────────────────────────────────────────────
-  const associations =
-    rec.brancheverenigingen ?? (rec.branchevereniging ? [rec.branchevereniging] : [])
-  for (const assocName of associations) {
+  // Brancheverenigingen
+  for (const assocName of rec.brancheverenigingen ?? []) {
     const trimmed = assocName?.trim()
     if (!trimmed) continue
     const slug = slugify(trimmed)
@@ -605,28 +560,31 @@ async function importOne(
       create: {
         tradespersonId: tradesperson.id,
         associationId: assoc.id,
-        detectionMethod: 'bron',
+        detectionMethod: 'enrichment',
       },
       update: {},
     })
   }
 
-  // ── Review-bronnen ───────────────────────────────────────────────────────
+  // Review-bronnen
   if (Array.isArray(rec.review_bronnen) && rec.review_bronnen.length > 0) {
-    await prisma.tradespersonReviewSource.deleteMany({
-      where: { tradespersonId: tradesperson.id },
-    })
     for (const r of rec.review_bronnen) {
       if (!r.url) continue
-      await prisma.tradespersonReviewSource.create({
-        data: {
-          tradespersonId: tradesperson.id,
-          platform: r.bron ?? 'unknown',
-          url: r.url,
-          rating: r.rating ?? null,
-          reviewCount: r.aantal ?? null,
-        },
+      // create-or-skip (geen unique key voor upsert)
+      const exists = await prisma.tradespersonReviewSource.findFirst({
+        where: { tradespersonId: tradesperson.id, url: r.url },
       })
+      if (!exists) {
+        await prisma.tradespersonReviewSource.create({
+          data: {
+            tradespersonId: tradesperson.id,
+            platform: r.bron ?? 'unknown',
+            url: r.url,
+            rating: r.rating ?? null,
+            reviewCount: r.aantal ?? null,
+          },
+        })
+      }
     }
   }
 }
@@ -637,5 +595,5 @@ main()
     process.exit(1)
   })
   .finally(async () => {
-    await prisma.$disconnect()
+    void prisma.$disconnect()
   })

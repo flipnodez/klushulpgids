@@ -125,6 +125,21 @@ model Tradesperson {
   privacySensitive Boolean   @default(false)
   scrapedAt        DateTime?
 
+  // Data-quality vlaggen (uit enrichment-pipeline). True = vereist handmatige
+  // review of toont een data-issue. Worden in fase 7 admin gebruikt voor
+  // filtering ("toon alleen records met problemen").
+  reviewNeeded         Boolean @default(false)
+  phoneInvalid         Boolean @default(false)
+  emailDnsInvalid      Boolean @default(false)
+  emailWebsiteMismatch Boolean @default(false)
+  /// HTTP-status van de website-check: "ok", "404", "timeout", "blocked", etc.
+  websiteStatus        String?
+  /// LLM-vertrouwensscore 0-100 (lager = betere kandidaat voor review)
+  trustScore           Int?
+  /// Ruwe enrichment-data: diensten_lijst, unique_selling_points, talen,
+  /// werkgebied, doelgroep, team_omvang, etc. — voor admin / fase 5 SEO.
+  enrichmentMeta       Json?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -145,6 +160,8 @@ model Tradesperson {
   @@index([tier])
   @@index([boostScore(sort: Desc)])
   @@index([ratingAvg(sort: Desc)])
+  @@index([reviewNeeded])
+  @@index([trustScore])
 }
 
 enum TeamSize {

@@ -1,145 +1,314 @@
 /**
- * Genereert prisma/seed-data/sample-tradespeople.json — een gecureerde subset
- * van vakbedrijven_merged.json (~2100 records, 3.5 MB) die WEL in de Scalingo
- * deploy meegaat. Bron-JSON (24 MB) staat in .slugignore.
- *
- * Run: npx tsx scripts/prepare-seed-data.ts
+ * Genereert prisma/seed-data/sample-tradespeople.json (gecureerd, ~5700 records)
+ * vanuit de enrichment-pipeline output.
  *
  * Strategie:
- *  - Quota per bron zodat alle 12 trades vertegenwoordigd zijn:
- *      technieknl (loodgieter/elektr): 1100
- *      bouwendnederland (klusbedrijven): 300
- *      onderhoudnl: 250
- *      bouwgarant: 180
- *      vlok (loodgieters): 100
- *      nvkl (cv-monteurs): 90
- *      groenkeur (hoveniers): 80
- *  - Per bron: sorteer op quality (kvk + tel + web + email + cert + branchev. + reviews)
- *  - Velden trimmen: lange beschrijvingen capped op 500 chars
+ *  - Skip relevantie='niet_relevant', bruikbaar=false, fuzzy_duplicate_of
+ *  - Map LLM-categorie (en categorie_uit_bron als fallback) naar 12 vakgebieden
+ *  - Bewaar quality-vlaggen per record (review_nodig, tel_invalide, etc.)
+ *  - Records zonder enkele categorie → schreven naar
+ *    `data-archive/needs-categorie-classification.json` voor latere curatie
+ *
+ * Run: npx tsx scripts/prepare-seed-data.ts
  */
 
-import { readFileSync, writeFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
 import process from 'node:process'
 
-const SOURCE_PATH = resolve(process.cwd(), 'vakbedrijven_merged.json')
+const SOURCE_PATH = resolve(process.cwd(), 'vakbedrijven_merged_enriched_openai_clean_qc.json')
 const OUTPUT_PATH = resolve(process.cwd(), 'prisma/seed-data/sample-tradespeople.json')
+const ARCHIVE_PATH = resolve(process.cwd(), 'data-archive/needs-categorie-classification.json')
 
-const QUOTAS: Record<string, number> = {
-  technieknl: 1100,
-  bouwendnederland: 300,
-  onderhoudnl: 250,
-  bouwgarant: 180,
-  vlok: 100,
-  nvkl: 90,
-  groenkeur: 80,
+// 40+ LLM-categorieën → 12 vakgebieden. None = SKIP.
+const CATEGORIE_MAP: Record<string, string | null> = {
+  // CV-monteurs
+  'CV-installateur': 'cv-monteurs',
+  'Warmtepomp-installateur': 'cv-monteurs',
+  Klimaattechniek: 'cv-monteurs',
+  'Airco-installateur': 'cv-monteurs',
+  Koeltechniek: 'cv-monteurs',
+  Koudetechniek: 'cv-monteurs',
+  Ventilatiespecialist: 'cv-monteurs',
+  Luchttechniek: 'cv-monteurs',
+  Installatietechniek: 'cv-monteurs',
+  // Dakdekkers
+  Dakdekker: 'dakdekkers',
+  // Elektriciens
+  Elektricien: 'elektriciens',
+  Beveiligingsinstallateur: 'elektriciens',
+  Domotica: 'elektriciens',
+  'Domotica-installateur': 'elektriciens',
+  Brandbeveiliging: 'elektriciens',
+  // Glaszetters
+  Glaszetter: 'glaszetters',
+  // Hoveniers
+  Hovenier: 'hoveniers',
+  Boomverzorger: 'hoveniers',
+  // Klusbedrijven
+  Klusbedrijf: 'klusbedrijven',
+  Verbouwbedrijf: 'klusbedrijven',
+  Renovatiebedrijf: 'klusbedrijven',
+  'Onderhoudsbedrijf vastgoed': 'klusbedrijven',
+  Onderhoudsbedrijf: 'klusbedrijven',
+  Bouwbedrijf: 'klusbedrijven',
+  Aannemer: 'klusbedrijven',
+  'Zonnepanelen-installateur': 'klusbedrijven',
+  Isolatiebedrijf: 'klusbedrijven',
+  Badkamerspecialist: 'klusbedrijven',
+  Keukenmonteur: 'klusbedrijven',
+  Restauratiebedrijf: 'klusbedrijven',
+  Afbouwbedrijf: 'klusbedrijven',
+  Montagebedrijf: 'klusbedrijven',
+  Interieurbouw: 'klusbedrijven',
+  Metselaar: 'klusbedrijven',
+  Gevelrenovatie: 'klusbedrijven',
+  // Loodgieters
+  Loodgieter: 'loodgieters',
+  'Sanitair-installateur': 'loodgieters',
+  Riolering: 'loodgieters',
+  Riooltechniek: 'loodgieters',
+  Rioolservice: 'loodgieters',
+  Rioleringsbedrijf: 'loodgieters',
+  Rioolontstopper: 'loodgieters',
+  Riool: 'loodgieters',
+  Rioolmonteur: 'loodgieters',
+  Rioolbeheer: 'loodgieters',
+  // Schilders
+  Schilder: 'schilders',
+  Behanger: 'schilders',
+  // Stukadoors
+  Stukadoor: 'stukadoors',
+  Plafondspecialist: 'stukadoors',
+  Gipsstelbedrijf: 'stukadoors',
+  'Plafond- en wandmonteur': 'stukadoors',
+  Plafondmontagebedrijf: 'stukadoors',
+  // Tegelzetters
+  Tegelzetter: 'tegelzetters',
+  'Natuursteen-specialist': 'tegelzetters',
+  // Timmerlieden
+  Timmerman: 'timmerlieden',
+  // Vloerenleggers
+  Vloerenlegger: 'vloerenleggers',
+  Gietvloeren: 'vloerenleggers',
+  Gietvloerenbedrijf: 'vloerenleggers',
+  // SKIP
+  Leverancier: null,
+  Onderwijsinstituut: null,
+  Onbekend: null,
+  Witgoed: null,
+  Witgoedservice: null,
+  Witgoedbedrijf: null,
+  Schoonmaakbedrijf: null,
+  Keuringsbedrijf: null,
 }
 
-type Record_ = {
+type RawRecord = Record<string, unknown> & {
   bedrijfsnaam?: string
-  beschrijving?: string
-  enrichment?: { kvk_nummer?: string; beschrijving?: string; [k: string]: unknown }
-  telefoonnummer?: string
-  website?: string
-  email?: string
-  certificeringen?: string[]
-  brancheverenigingen?: string[]
-  google_reviews_count?: number
-  _source?: string
-  _source_id?: string
-  [k: string]: unknown
+  categorie?: string
+  categorie_uit_bron?: string
+  relevantie?: string
+  bruikbaar?: boolean
+  fuzzy_duplicate_of?: string
 }
 
-const KEEP_FIELDS = new Set([
-  'bedrijfsnaam',
-  'plaats',
-  'straat',
-  'adres',
-  'postcode',
-  'email',
-  'telefoonnummer',
-  'website',
-  'marktfocus',
-  'certificeringen',
-  'brancheverenigingen',
-  'branchevereniging',
-  'specialisaties',
-  'social_media',
-  'google_reviews_count',
-  'google_reviews_score',
-  'review_url',
-  'zoekterm',
-  'sbi_codes',
-  'enrichment',
-  'relevantie',
-  '_source',
-  '_source_id',
-  '_sources',
-  '_source_ids',
-  '_fetched_at',
-])
+function splitCompound(value: string | undefined): string[] {
+  if (!value) return []
+  return value
+    .split('+')
+    .map((p) => p.trim())
+    .filter(Boolean)
+}
 
-function trim(rec: Record_): Record_ {
-  const out: Record_ = {}
-  for (const k of Object.keys(rec)) {
-    if (KEEP_FIELDS.has(k)) out[k] = rec[k] as never
-  }
-  if (rec.beschrijving) out.beschrijving = rec.beschrijving.slice(0, 500)
-  if (out.enrichment && typeof out.enrichment === 'object' && out.enrichment.beschrijving) {
-    out.enrichment = {
-      ...out.enrichment,
-      beschrijving: out.enrichment.beschrijving.slice(0, 500),
+function mapToVakgebied(rec: RawRecord): { slug: string | null; reason: string } {
+  if (rec.relevantie === 'niet_relevant') return { slug: null, reason: 'niet_relevant' }
+  if (rec.bruikbaar === false) return { slug: null, reason: 'bruikbaar_false' }
+  if (rec.fuzzy_duplicate_of) return { slug: null, reason: 'fuzzy_duplicate' }
+  if (!rec.bedrijfsnaam) return { slug: null, reason: 'no_company_name' }
+
+  const candidates = [...splitCompound(rec.categorie), ...splitCompound(rec.categorie_uit_bron)]
+  if (candidates.length === 0) return { slug: null, reason: 'no_categorie' }
+
+  for (const cat of candidates) {
+    if (cat in CATEGORIE_MAP) {
+      const mapped = CATEGORIE_MAP[cat]
+      if (mapped == null) return { slug: null, reason: `cat_blacklist:${cat}` }
+      return { slug: mapped, reason: `mapped:${cat}` }
     }
+  }
+  return { slug: null, reason: `unmapped:${candidates[0] ?? 'unknown'}` }
+}
+
+// Drop empty fields om JSON klein te houden.
+function pruneEmpty<T extends Record<string, unknown>>(obj: T): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === null || v === undefined || v === '' || v === false) continue
+    if (Array.isArray(v) && v.length === 0) continue
+    if (typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 0) continue
+    out[k] = v
   }
   return out
 }
 
-function qualityScore(r: Record_): number {
-  let s = 0
-  if (r.enrichment?.kvk_nummer) s += 20
-  if (r.telefoonnummer) s += 5
-  if (r.website) s += 5
-  if (r.email) s += 5
-  if (r.certificeringen?.length) s += 10
-  if (r.brancheverenigingen?.length) s += 5
-  if ((r.google_reviews_count ?? 0) > 5) s += 10
-  return s
+// Trim record voor deploy-bundle. Aggressief trimmen — push naar GitHub faalt
+// boven ~10 MB. Behoud alleen wat het import-script daadwerkelijk gebruikt.
+function trim(rec: RawRecord, vakgebied: string): Record<string, unknown> {
+  // Beschrijving: 400 chars max
+  const beschr = typeof rec.beschrijving === 'string' ? rec.beschrijving.slice(0, 400) : null
+
+  // _meta: alleen kvk + btw + source
+  const m = (rec._meta ?? {}) as Record<string, unknown>
+  const meta = pruneEmpty({
+    _source: m._source,
+    _source_id: m._source_id,
+    _fetched_at: m._fetched_at,
+    kvk_nummer: m.kvk_nummer,
+    btw_nummer: m.btw_nummer,
+  })
+
+  // Cap arrays op redelijke maxima
+  const certs = Array.isArray(rec.certificeringen)
+    ? rec.certificeringen.slice(0, 8).map((c) => (typeof c === 'string' ? c.slice(0, 120) : c))
+    : []
+  const associations = Array.isArray(rec.brancheverenigingen)
+    ? rec.brancheverenigingen.slice(0, 5)
+    : []
+  const specs = Array.isArray(rec.specialisaties) ? rec.specialisaties.slice(0, 8) : []
+  const diensten = Array.isArray(rec.diensten_lijst) ? rec.diensten_lijst.slice(0, 6) : []
+  const usp = Array.isArray(rec.unique_selling_points) ? rec.unique_selling_points.slice(0, 3) : []
+
+  // Review-bronnen: alleen url + bron. Query-params verwijderd uit URLs om
+  // te voorkomen dat scraped Google Maps API keys (uit embed-iframes) in de
+  // dataset belanden — GitHub secret scanner detecteert deze terecht.
+  const reviewBronnen = Array.isArray(rec.review_bronnen)
+    ? rec.review_bronnen.slice(0, 3).map((r) => {
+        const item = r as Record<string, unknown>
+        let url = typeof item.url === 'string' ? item.url : null
+        if (url) {
+          try {
+            const u = new URL(url)
+            u.search = '' // strip alle query-params
+            u.hash = ''
+            url = u.toString()
+          } catch {
+            // Niet-parsebare URL → laat staan (komt zelden voor)
+          }
+        }
+        return pruneEmpty({ url, bron: item.bron })
+      })
+    : []
+
+  return pruneEmpty({
+    bedrijfsnaam: rec.bedrijfsnaam,
+    plaats: rec.plaats,
+    gemeente: rec.gemeente,
+    provincie: rec.provincie,
+    straat: rec.straat,
+    postcode: rec.postcode,
+    latitude: rec.latitude,
+    longitude: rec.longitude,
+    email: rec.email,
+    telefoonnummer: rec.telefoonnummer,
+    website: rec.website,
+    beschrijving: beschr,
+    marktfocus: rec.marktfocus,
+    certificeringen: certs,
+    brancheverenigingen: associations,
+    specialisaties: specs,
+    diensten_lijst: diensten,
+    unique_selling_points: usp,
+    team_omvang: rec.team_omvang,
+    spoeddienst: rec.spoeddienst,
+    social_media: rec.social_media,
+    google_reviews_count: rec.google_reviews_count,
+    google_reviews_score: rec.google_reviews_score,
+    review_bronnen: reviewBronnen,
+    relevantie: rec.relevantie,
+    review_nodig: rec.review_nodig === true,
+    tel_invalide: rec.tel_invalide === true,
+    email_dns_invalide: rec.email_dns_invalide === true,
+    email_website_mismatch: rec.email_website_mismatch === true,
+    website_status: rec.website_status,
+    vertrouwensscore: rec.vertrouwensscore,
+    _meta: meta,
+    _vakgebied: vakgebied,
+  })
 }
 
 console.log(`📂 Reading ${SOURCE_PATH}…`)
 const raw = readFileSync(SOURCE_PATH, 'utf8')
-const data: Record_[] = JSON.parse(raw)
-console.log(`📊 ${data.length} records loaded`)
+const data: RawRecord[] = JSON.parse(raw)
+console.log(`📊 ${data.length} records loaded\n`)
 
-// Bucket per source, sort desc by quality
-const bySource = new Map<string, Record_[]>()
-for (const r of data) {
-  const src = r._source ?? '?'
-  if (!bySource.has(src)) bySource.set(src, [])
-  bySource.get(src)!.push(r)
-}
-for (const [, list] of bySource) {
-  list.sort((a, b) => qualityScore(b) - qualityScore(a))
-}
+const imported: Record<string, unknown>[] = []
+const archive: RawRecord[] = []
+const skipReasons = new Map<string, number>()
+const perVakgebied = new Map<string, number>()
 
-// Apply quotas
-const selected: Record_[] = []
-for (const [src, n] of Object.entries(QUOTAS)) {
-  const list = bySource.get(src) ?? []
-  const take = list.slice(0, n)
-  selected.push(...take)
-  console.log(`  ${src.padEnd(25)} ${take.length.toString().padStart(4)} / ${n}`)
+for (const rec of data) {
+  const { slug, reason } = mapToVakgebied(rec)
+  skipReasons.set(reason, (skipReasons.get(reason) ?? 0) + 1)
+
+  if (slug) {
+    perVakgebied.set(slug, (perVakgebied.get(slug) ?? 0) + 1)
+    imported.push(trim(rec, slug))
+  } else if (reason === 'no_categorie') {
+    archive.push(rec)
+  }
+  // Anders: skip volledig (relevantie/bruikbaar/blacklist/duplicate)
 }
 
-// Deterministic order (by source_id) zodat re-runs hetzelfde bestand geven
-selected.sort((a, b) => (a._source_id ?? '').localeCompare(b._source_id ?? ''))
+// Sorteer deterministisch voor reproduceerbare diffs
+imported.sort(
+  (a, b) =>
+    String(a._vakgebied).localeCompare(String(b._vakgebied)) ||
+    String(a.bedrijfsnaam).localeCompare(String(b.bedrijfsnaam)),
+)
 
-// Trim + write
-const trimmed = selected.map(trim)
-const json = JSON.stringify(trimmed)
-writeFileSync(OUTPUT_PATH, json, 'utf8')
+mkdirSync(dirname(OUTPUT_PATH), { recursive: true })
+mkdirSync(dirname(ARCHIVE_PATH), { recursive: true })
 
-const size = json.length
-console.log(`\n✅ Wrote ${OUTPUT_PATH}`)
-console.log(`   Records: ${trimmed.length}`)
-console.log(`   Size:    ${(size / 1024 / 1024).toFixed(2)} MB`)
+writeFileSync(OUTPUT_PATH, JSON.stringify(imported), 'utf8')
+writeFileSync(
+  ARCHIVE_PATH,
+  JSON.stringify(
+    {
+      _description:
+        'Records uit vakbedrijven_merged_enriched_openai_clean_qc.json zonder LLM-categorie of bron-categorie. Niet geïmporteerd. Voeg later toe via handmatige curatie of een nieuwe LLM-pas.',
+      _generated_at: new Date().toISOString(),
+      _count: archive.length,
+      records: archive,
+    },
+    null,
+    2,
+  ),
+  'utf8',
+)
+
+const importedSize = JSON.stringify(imported).length
+const archiveSize = JSON.stringify(archive).length
+
+console.log('=== Geschreven ===')
+console.log(
+  `  ${OUTPUT_PATH}\n  → ${imported.length} records, ${(importedSize / 1024 / 1024).toFixed(2)} MB`,
+)
+console.log(
+  `  ${ARCHIVE_PATH}\n  → ${archive.length} records, ${(archiveSize / 1024 / 1024).toFixed(2)} MB`,
+)
+console.log()
+console.log('=== Vakgebied verdeling ===')
+const sortedSlugs = [...perVakgebied.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+for (const [slug, n] of sortedSlugs) {
+  console.log(`  ${slug.padEnd(18)} ${n.toString().padStart(5)}`)
+}
+console.log(`  ${'TOTAAL'.padEnd(18)} ${imported.length.toString().padStart(5)}`)
+
+console.log()
+console.log('=== Skip-redenen ===')
+const sortedReasons = [...skipReasons.entries()]
+  .filter(([r]) => !r.startsWith('mapped:'))
+  .sort((a, b) => b[1] - a[1])
+for (const [reason, n] of sortedReasons) {
+  console.log(`  ${reason.padEnd(40)} ${n.toString().padStart(5)}`)
+}

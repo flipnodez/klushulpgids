@@ -55,11 +55,8 @@
   }
   .main {
     padding: var(--sp-4) var(--sp-6);
-    flex-direction: column;
-    align-items: flex-start;
   }
   .nav {
-    gap: var(--sp-5);
-    font-size: var(--fs-xs);
+    display: none;
   }
 }

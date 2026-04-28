@@ -3,6 +3,7 @@ import { clsx } from 'clsx'
 import Link from 'next/link'
 
 import { Logo } from '../ui/Logo'
+import { MobileNav } from './MobileNav'
 import styles from './Header.module.css'
 
 type NavItem = {
@@ -99,6 +100,7 @@ export function Header({
             ),
           )}
         </nav>
+        <MobileNav nav={nav} />
       </div>
     </header>
   )

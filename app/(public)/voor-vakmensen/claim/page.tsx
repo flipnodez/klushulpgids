@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
+import { Breadcrumbs } from '@/components/layout/Breadcrumbs'
 import { Container } from '@/components/ui/Container'
 import { EmDashLabel } from '@/components/ui/EmDashLabel'
 
@@ -17,6 +18,15 @@ export const metadata: Metadata = {
 export default function ClaimPage() {
   return (
     <Container>
+      <div className={styles.crumbs}>
+        <Breadcrumbs
+          items={[
+            { label: 'Home', href: '/' },
+            { label: 'Voor vakmensen', href: '/voor-vakmensen' },
+            { label: 'Profiel claimen' },
+          ]}
+        />
+      </div>
       <article className={styles.wrap}>
         <EmDashLabel>Vakmensen</EmDashLabel>
         <h1 className={styles.title}>

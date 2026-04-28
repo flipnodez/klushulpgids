@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
+import { Breadcrumbs } from '@/components/layout/Breadcrumbs'
 import { Container } from '@/components/ui/Container'
 import { EmDashLabel } from '@/components/ui/EmDashLabel'
 
@@ -20,6 +21,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const sp = await searchParams
   return (
     <Container>
+      <div className={styles.crumbs}>
+        <Breadcrumbs items={[{ label: 'Home', href: '/' }, { label: 'Inloggen' }]} />
+      </div>
       <article className={styles.wrap}>
         <EmDashLabel>Toegang</EmDashLabel>
         <h1 className={styles.title}>

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
+import { Breadcrumbs } from '@/components/layout/Breadcrumbs'
 import { Container } from '@/components/ui/Container'
 import { EmDashLabel } from '@/components/ui/EmDashLabel'
 
@@ -28,6 +29,15 @@ export default async function LoginErrorPage({
 
   return (
     <Container>
+      <div className={styles.crumbs}>
+        <Breadcrumbs
+          items={[
+            { label: 'Home', href: '/' },
+            { label: 'Inloggen', href: '/inloggen' },
+            { label: 'Foutmelding' },
+          ]}
+        />
+      </div>
       <article className={styles.wrap}>
         <EmDashLabel>Foutmelding</EmDashLabel>
         <h1 className={styles.title}>Er ging iets mis</h1>

@@ -8,7 +8,7 @@ import { hashEmail } from '@/lib/encryption'
 import { Container } from '@/components/ui/Container'
 import { EmDashLabel } from '@/components/ui/EmDashLabel'
 
-import styles from '../../../(auth)/inloggen/page.module.css'
+import styles from '../../../(public)/inloggen/page.module.css'
 
 export const metadata: Metadata = {
   title: 'Welkom in uw dashboard',

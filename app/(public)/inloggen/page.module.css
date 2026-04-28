@@ -1,6 +1,10 @@
+.crumbs {
+  padding: var(--sp-5) 0 0;
+}
+
 .wrap {
   max-width: 480px;
-  margin: var(--sp-9) auto;
+  margin: var(--sp-7) auto var(--sp-9);
   padding: 0 var(--container-pad);
 }
 

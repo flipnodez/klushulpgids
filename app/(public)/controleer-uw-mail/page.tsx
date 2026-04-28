@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
+import { Breadcrumbs } from '@/components/layout/Breadcrumbs'
 import { Container } from '@/components/ui/Container'
 import { EmDashLabel } from '@/components/ui/EmDashLabel'
 
@@ -19,6 +20,15 @@ export default async function VerifyRequestPage({
   const sp = await searchParams
   return (
     <Container>
+      <div className={styles.crumbs}>
+        <Breadcrumbs
+          items={[
+            { label: 'Home', href: '/' },
+            { label: 'Inloggen', href: '/inloggen' },
+            { label: 'Controleer uw mail' },
+          ]}
+        />
+      </div>
       <article className={styles.wrap}>
         <EmDashLabel>Verstuurd</EmDashLabel>
         <h1 className={styles.title}>Controleer uw mailbox</h1>

@@ -67,6 +67,42 @@
   color: var(--ink);
   font-weight: 500;
 }
+.ctaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  align-items: center;
+  margin: var(--sp-4) 0;
+}
+.ctaPrimary {
+  display: inline-block;
+  background: var(--ink);
+  color: #fff;
+  padding: 14px 28px;
+  font-family: var(--font-sans, Inter, sans-serif);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: background var(--t-fast);
+}
+.ctaPrimary:hover,
+.ctaPrimary:focus-visible {
+  background: var(--accent);
+}
+.ctaSecondary {
+  font-family: var(--font-sans, Inter, sans-serif);
+  font-size: 14px;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.ctaSecondary:hover,
+.ctaSecondary:focus-visible {
+  color: var(--accent);
+}
+
 .faq dt {
   font-family: var(--font-serif, var(--font-serif-fallback));
   font-size: 19px;

@@ -356,10 +356,18 @@ export default async function VakmanProfilePage({ params }: { params: Promise<Pa
           <EmDashLabel variant="muted">Hoe wij verifiëren</EmDashLabel>
           <p className={styles.body}>
             Profielen worden gecontroleerd op KvK-registratie en — waar mogelijk — gestaafd met
-            certificeringen en branche­verenigings­lidmaatschap. De vakman kan zijn profiel zelf
-            claimen om gegevens bij te werken. Vragen of onnauwkeurigheden? Mail{' '}
+            certificeringen en branche­verenigings­lidmaatschap. Vragen of onnauwkeurigheden? Mail{' '}
             <a href="mailto:redactie@klushulpgids.nl">redactie@klushulpgids.nl</a>.
           </p>
+          {!tp.profileClaimed && (
+            <p className={styles.body}>
+              <strong>Is dit uw bedrijf?</strong>{' '}
+              <Link href="/voor-vakmensen/claim" className={styles.inlineLink}>
+                Claim uw profiel gratis
+              </Link>{' '}
+              — beheer foto&apos;s, beschikbaarheid en reageer op reviews.
+            </p>
+          )}
         </section>
       </Container>
 

@@ -70,7 +70,21 @@ export function Header({
     <header className={clsx(styles.masthead, sticky && styles.sticky, className)}>
       <div className={styles.top}>
         <span className="label label-muted">{topLeft ?? defaultDateStamp()}</span>
-        {topRight && <span className="label label-accent">{topRight}</span>}
+        {topRight !== undefined ? (
+          topRight && <span className="label label-accent">{topRight}</span>
+        ) : (
+          <span className={clsx('label label-muted', styles.topLinks)}>
+            <Link href="/voor-vakmensen/claim" className={styles.topLink}>
+              Vakman? Claim profiel
+            </Link>
+            <span aria-hidden="true" className={styles.topSep}>
+              ·
+            </span>
+            <Link href="/inloggen" className={styles.topLink}>
+              Inloggen
+            </Link>
+          </span>
+        )}
       </div>
       <div className={styles.main}>
         <Link href="/" className="plain" aria-label="Naar home">

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 
 import { Breadcrumbs } from '@/components/layout/Breadcrumbs'
 import { Container } from '@/components/ui/Container'
@@ -63,13 +64,24 @@ export default function VoorVakmensenPage() {
           <h2 className={styles.h2}>Profiel claimen</h2>
           <p className={styles.body}>
             Uw bedrijf staat mogelijk al in de gids — wij verzamelen publieke gegevens uit Kamer van
-            Koophandel en branche­verenigingen. U kunt uw profiel claimen via een
-            KvK-verificatie­proces. Daarna staat u zelf aan het roer over wat wel en niet getoond
-            wordt.
+            Koophandel en branche­verenigingen. U kunt uw profiel claimen via uw KvK-nummer: wij
+            sturen een eenmalige inlog-link naar het bekende e-mailadres van uw bedrijf, daarna
+            staat u zelf aan het roer.
           </p>
+
+          <div className={styles.ctaRow}>
+            <Link href="/voor-vakmensen/claim" className={styles.ctaPrimary}>
+              Claim uw profiel →
+            </Link>
+            <Link href="/inloggen" className={styles.ctaSecondary}>
+              Reeds geclaimd? Inloggen
+            </Link>
+          </div>
+
           <p className={styles.body}>
-            Het claim-proces is in voorbereiding (fase 6). Mail tot dan voor handmatige wijzigingen:{' '}
-            <a href="mailto:redactie@klushulpgids.nl">redactie@klushulpgids.nl</a>.
+            Geen profiel kunnen vinden? Mail{' '}
+            <a href="mailto:redactie@klushulpgids.nl">redactie@klushulpgids.nl</a> met uw
+            bedrijfsnaam en KvK-nummer — onze redactie maakt dan een nieuw profiel voor u aan.
           </p>
         </section>
 

@@ -1,6 +1,5 @@
 import { ImageResponse } from 'next/og'
 
-export const runtime = 'edge'
 export const contentType = 'image/png'
 
 const SIZE = { width: 1200, height: 630 }
@@ -58,9 +57,7 @@ export async function GET(request: Request) {
             fontWeight: 600,
           }}
         >
-          <span
-            style={{ display: 'inline-block', width: 56, height: 2, background: COLORS.accent }}
-          />
+          <span style={{ display: 'flex', width: 56, height: 2, background: COLORS.accent }} />
           {kicker}
         </div>
 

@@ -25,10 +25,20 @@ const TEST = {
 }
 
 async function main() {
-  const city = await prisma.city.findFirst({ where: { name: TEST.cityName } })
+  let city = await prisma.city.findFirst({ where: { name: TEST.cityName } })
   if (!city) {
-    console.error(`✗ City "${TEST.cityName}" niet gevonden`)
-    process.exit(1)
+    console.log(`↻ City "${TEST.cityName}" niet gevonden — wordt aangemaakt`)
+    city = await prisma.city.create({
+      data: {
+        name: TEST.cityName,
+        slug: 'diemen',
+        province: 'Noord-Holland',
+        latitude: 52.3393,
+        longitude: 4.9615,
+        population: 31000,
+      },
+    })
+    console.log(`✓ Diemen aangemaakt: ${city.id}`)
   }
 
   const trade = await prisma.trade.findFirst({ where: { slug: TEST.tradeSlug } })

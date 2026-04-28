@@ -7,6 +7,7 @@ import { TradespersonCard } from '@/components/features/tradesperson/Tradesperso
 import { Container } from '@/components/ui/Container'
 import { EmDashLabel } from '@/components/ui/EmDashLabel'
 import { Rule } from '@/components/ui/Rule'
+import { JsonLd } from '@/components/seo/JsonLd'
 import {
   countTradespeopleByVakAndCity,
   getCityBySlug,
@@ -18,6 +19,8 @@ import {
   getVakCityStats,
 } from '@/lib/queries'
 import type { SortOption, TradespersonFilters } from '@/lib/queries'
+import { breadcrumbSchema, faqSchema, itemListSchema } from '@/lib/schema'
+import { cached } from '@/lib/cache'
 
 import styles from './page.module.css'
 
@@ -36,13 +39,36 @@ const PAGE_SIZE = 20
 
 export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
   const { vak, stad } = await params
-  const [trade, city] = await Promise.all([getTradeBySlug(vak), getCityBySlug(stad)])
+  const [trade, city, stats] = await Promise.all([
+    getTradeBySlug(vak),
+    getCityBySlug(stad),
+    getVakCityStats(vak, stad),
+  ])
   if (!trade || !city) return {}
 
+  const title = `${trade.nameSingular} ${city.name} — ${stats.count} vakmensen in de gids`
+  const description = `Vind een ${trade.nameSingular.toLowerCase()} in ${city.name}. ${stats.count} KvK-geverifieerde vakmensen, beoordelingen en contactgegevens. Geen lead-fee — u neemt rechtstreeks contact op.`
+
+  const canonical = `/${trade.slug}/${city.slug}`
+  const ogImage = `/api/og?vak=${encodeURIComponent(trade.namePlural)}&stad=${encodeURIComponent(city.name)}`
+
   return {
-    title: trade.seoTitleTemplate.replace('{city}', city.name),
-    description: trade.seoDescriptionTemplate.replace('{city}', city.name),
-    alternates: { canonical: `/${trade.slug}/${city.slug}` },
+    title,
+    description,
+    alternates: { canonical },
+    openGraph: {
+      title,
+      description,
+      url: canonical,
+      type: 'website',
+      images: [{ url: ogImage, width: 1200, height: 630 }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [ogImage],
+    },
   }
 }
 
@@ -92,10 +118,14 @@ export default async function VakStadPage({
       filters,
     }),
     countTradespeopleByVakAndCity(vak, stad, filters),
-    getVakCityStats(vak, stad),
-    getSpecialtiesForVakAndCity(vak, stad),
-    getRelatedTradesInCity(city.id, trade.id, 6),
-    getNearbyCities(city, 6),
+    cached(`vak-stad:stats:${vak}:${stad}`, 3600, () => getVakCityStats(vak, stad)),
+    cached(`vak-stad:specialties:${vak}:${stad}`, 3600, () =>
+      getSpecialtiesForVakAndCity(vak, stad),
+    ),
+    cached(`vak-stad:related-trades:${city.id}:${trade.id}`, 3600, () =>
+      getRelatedTradesInCity(city.id, trade.id, 6),
+    ),
+    cached(`vak-stad:nearby-cities:${city.id}`, 86400, () => getNearbyCities(city, 6)),
   ])
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
@@ -115,8 +145,41 @@ export default async function VakStadPage({
       : 'huishoudelijke installaties en kleinere klussen'
   }.`
 
+  // ── Schema.org JSON-LD ─────────────────────────────────────────────────
+  const schemas = [
+    breadcrumbSchema([
+      { name: 'Home', url: '/' },
+      { name: trade.namePlural, url: `/${trade.slug}` },
+      { name: city.name },
+    ]),
+    itemListSchema(
+      results.slice(0, 10).map((tp) => ({
+        name: tp.companyName,
+        url: `/vakman/${tp.slug}`,
+        ...(tp.description && { description: tp.description.slice(0, 160) }),
+      })),
+      `${trade.namePlural} in ${city.name}`,
+    ),
+    faqSchema([
+      {
+        question: `Hoeveel ${trade.namePlural.toLowerCase()} staan er in de gids voor ${city.name}?`,
+        answer: `Er staan ${stats.count} KvK-geverifieerde ${trade.namePlural.toLowerCase()} in ${city.name} in de Klushulpgids${stats.avgRating ? `, met een gemiddelde beoordeling van ${stats.avgRating.toFixed(1)} sterren` : ''}.`,
+      },
+      {
+        question: `Hoe kies ik een goede ${trade.nameSingular.toLowerCase()} in ${city.name}?`,
+        answer: `Vergelijk ${trade.namePlural.toLowerCase()} op basis van klantbeoordelingen, certificeringen (zoals InstallQ, VCA), brancheverenigings­lidmaatschap (Techniek Nederland, BouwGarant), en jaren ervaring. Onze gids toont al deze gegevens transparant.`,
+      },
+      {
+        question: 'Betaal ik een fee als ik via Klushulpgids contact opneem?',
+        answer:
+          'Nee. Klushulpgids is een onafhankelijke gids — geen bemiddelaar. U neemt rechtstreeks telefonisch of per e-mail contact op met de vakman; wij vragen geen lead-fee en delen uw gegevens niet met derden.',
+      },
+    ]),
+  ]
+
   return (
     <>
+      <JsonLd data={schemas} />
       <Container>
         <div className={styles.crumbWrap}>
           <Breadcrumbs

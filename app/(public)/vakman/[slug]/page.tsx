@@ -15,7 +15,9 @@ import { EmDashLabel } from '@/components/ui/EmDashLabel'
 import { Rule } from '@/components/ui/Rule'
 import { Stamp } from '@/components/ui/Stamp'
 import { Stars } from '@/components/ui/Stars'
+import { JsonLd } from '@/components/seo/JsonLd'
 import { getApprovedReviews, getRelatedTradespeople, getTradespersonBySlug } from '@/lib/queries'
+import { breadcrumbSchema, localBusinessSchema } from '@/lib/schema'
 
 import styles from './page.module.css'
 
@@ -70,8 +72,40 @@ export default async function VakmanProfilePage({ params }: { params: Promise<Pa
   const displayRating = tp.ratingAvg ?? tp.googleRating
   const displayCount = tp.ratingAvg != null ? tp.ratingCount : tp.googleReviewsCount
 
+  // ── Schema.org JSON-LD ─────────────────────────────────────────────────
+  const schemas = [
+    breadcrumbSchema([
+      { name: 'Home', url: '/' },
+      ...(primaryTrade ? [{ name: primaryTrade.namePlural, url: `/${primaryTrade.slug}` }] : []),
+      ...(tp.city && primaryTrade
+        ? [{ name: tp.city.name, url: `/${primaryTrade.slug}/${tp.city.slug}` }]
+        : []),
+      { name: tp.companyName },
+    ]),
+    localBusinessSchema({
+      slug: tp.slug,
+      companyName: tp.companyName,
+      description: tp.description,
+      phone: tp.phone,
+      websiteUrl: tp.websiteUrl,
+      street: tp.street,
+      houseNumber: tp.houseNumber,
+      postalCode: tp.postalCode,
+      latitude: tp.latitude,
+      longitude: tp.longitude,
+      ratingAvg: tp.ratingAvg,
+      ratingCount: tp.ratingCount,
+      googleRating: tp.googleRating,
+      googleReviewsCount: tp.googleReviewsCount,
+      city: tp.city,
+      trades: primaryTrade ? [{ trade: { nameSingular: primaryTrade.nameSingular } }] : [],
+      foundedYear: tp.foundedYear,
+    }),
+  ]
+
   return (
     <>
+      <JsonLd data={schemas} />
       <Container>
         <div className={styles.crumbWrap}>
           <Breadcrumbs

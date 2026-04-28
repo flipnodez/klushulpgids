@@ -8,6 +8,7 @@ import { TradespersonCard } from '@/components/features/tradesperson/Tradesperso
 import { Container } from '@/components/ui/Container'
 import { EmDashLabel } from '@/components/ui/EmDashLabel'
 import { Rule } from '@/components/ui/Rule'
+import { JsonLd } from '@/components/seo/JsonLd'
 import {
   countTradespeopleByVak,
   getBlogPostsByTrade,
@@ -15,6 +16,7 @@ import {
   getTopTradespeopleByTrade,
   getTradeBySlug,
 } from '@/lib/queries'
+import { breadcrumbSchema, collectionPageSchema, faqSchema } from '@/lib/schema'
 
 import styles from './page.module.css'
 
@@ -46,8 +48,37 @@ export default async function VakPage({ params }: { params: Promise<Params> }) {
     getBlogPostsByTrade(trade.id, 3),
   ])
 
+  const schemas = [
+    breadcrumbSchema([
+      { name: 'Home', url: '/' },
+      { name: 'Vakgebieden', url: '/vakgebieden' },
+      { name: trade.namePlural },
+    ]),
+    collectionPageSchema({
+      name: `${trade.namePlural} in Nederland`,
+      description: trade.description,
+      url: `/${trade.slug}`,
+    }),
+    faqSchema([
+      {
+        question: `Wat doet een ${trade.nameSingular.toLowerCase()}?`,
+        answer: trade.description,
+      },
+      {
+        question: `Hoeveel ${trade.namePlural.toLowerCase()} staan er in de gids?`,
+        answer: `Er staan ${totalCount} KvK-geverifieerde ${trade.namePlural.toLowerCase()} in de Klushulpgids, verspreid over heel Nederland.`,
+      },
+      {
+        question: 'Hoe kies ik een betrouwbare vakman?',
+        answer:
+          'Vergelijk vakmensen op basis van klantbeoordelingen, certificeringen, brancheverenigings­lidmaatschap en jaren ervaring. Onze gids toont al deze gegevens transparant — u neemt rechtstreeks contact op zonder tussenpersoon.',
+      },
+    ]),
+  ]
+
   return (
     <>
+      <JsonLd data={schemas} />
       <Container>
         <div className={styles.crumbWrap}>
           <Breadcrumbs

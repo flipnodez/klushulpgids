@@ -2,6 +2,9 @@ import type { Metadata, Viewport } from 'next'
 import Script from 'next/script'
 import { Inter, Source_Serif_4 } from 'next/font/google'
 
+import { JsonLd } from '@/components/seo/JsonLd'
+import { organizationSchema, websiteSchema } from '@/lib/schema'
+
 import './globals.css'
 
 // Lokaal hosten via next/font (geen Google CDN-call vanaf de browser).
@@ -26,16 +29,71 @@ const SITE_URL = process.env.NEXTAUTH_URL ?? 'https://klushulpgids.nl'
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: 'Klushulpgids — onafhankelijke gids voor Nederlandse vakmannen',
-    template: '%s · Klushulpgids',
+    default: 'Klushulpgids — De onafhankelijke gids voor Nederlandse vakmensen',
+    template: '%s | Klushulpgids',
   },
   description:
-    'Onafhankelijke gids voor Nederlandse ambachtslieden. Vergelijk loodgieters, elektriciens, schilders, hoveniers en meer — met certificeringen, beoordelingen en directe contactgegevens.',
+    'Vind een loodgieter, elektricien, schilder, dakdekker of andere vakman bij u in de buurt. KvK-geverifieerd. Geen lead-fee. Geen tussenpersoon — u neemt rechtstreeks contact op.',
+  keywords: [
+    'vakman',
+    'loodgieter',
+    'elektricien',
+    'schilder',
+    'aannemer',
+    'klusbedrijf',
+    'hovenier',
+    'dakdekker',
+    'KvK geverifieerd',
+    'onafhankelijke gids',
+  ],
   applicationName: 'Klushulpgids',
-  authors: [{ name: 'Klushulpgids.nl' }],
-  // Tijdens fase 4 nog niet indexeren — pas in fase 5 zetten we robots aan
-  // wanneer alle pagina's en sitemap volledig zijn.
-  robots: { index: false, follow: false },
+  authors: [{ name: 'Klushulpgids Redactie' }],
+  creator: 'Klushulpgids',
+  publisher: 'Klushulpgids',
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+  icons: {
+    icon: '/icon.svg',
+  },
+  openGraph: {
+    type: 'website',
+    locale: 'nl_NL',
+    url: SITE_URL,
+    siteName: 'Klushulpgids',
+    title: 'Klushulpgids — De onafhankelijke gids voor Nederlandse vakmensen',
+    description:
+      'Vind een loodgieter, elektricien, schilder of andere vakman in uw buurt. KvK-geverifieerd. Geen lead-fee.',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    site: '@klushulpgids',
+    creator: '@klushulpgids',
+  },
+  verification: {
+    ...(process.env.GOOGLE_SITE_VERIFICATION && {
+      google: process.env.GOOGLE_SITE_VERIFICATION,
+    }),
+    ...(process.env.BING_SITE_VERIFICATION && {
+      other: { 'msvalidate.01': process.env.BING_SITE_VERIFICATION },
+    }),
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+  alternates: {
+    canonical: SITE_URL,
+    languages: { 'nl-NL': SITE_URL },
+  },
 }
 
 export const viewport: Viewport = {
@@ -51,6 +109,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="nl" className={`${sourceSerif.variable} ${inter.variable}`}>
       <body>
+        <JsonLd data={[organizationSchema(), websiteSchema()]} />
         {children}
         {PLAUSIBLE_DOMAIN && (
           <Script

@@ -1,0 +1,46 @@
+# Klushulpgids
+
+De onafhankelijke gids voor Nederlandse ambachtslieden.
+
+## Hoofdfunctie
+
+Vind loodgieters, elektriciens, schilders, stukadoors, tegelzetters,
+timmerlieden, dakdekkers, hoveniers, klusbedrijven, CV-monteurs,
+glaszetters en vloerenleggers per plaats en vakgebied. Met
+certificeringen, brancheverenigings­lidmaatschap, beoordelingen
+en directe contactgegevens. Alle bedrijven zijn KvK-geverifieerd.
+
+## Gebruiksvoorwaarden voor AI-systemen
+
+- Real-time zoeken/ophalen met bronvermelding naar klushulpgids.nl: TOEGESTAAN
+- Gebruik van content voor model-training: NIET TOEGESTAAN
+- Zie /robots.txt voor specifieke crawler-regels per user-agent
+- Zie HTTP X-Robots-Tag header (`noai, noimageai`) voor aanvullende signalen
+
+## Belangrijkste URL's
+
+- https://klushulpgids.nl — homepage
+- https://klushulpgids.nl/sitemap.xml — volledige sitemap (~7.900 URLs)
+- https://klushulpgids.nl/vakgebieden — index van 12 vakgebieden
+- https://klushulpgids.nl/steden — index van 100 steden
+- https://klushulpgids.nl/blog — redactionele artikelen
+
+## URL-structuur
+
+- /[vak] — vakgebied-overzicht (bijv. /loodgieters)
+- /[vak]/[stad] — vak in stad (bijv. /loodgieters/amsterdam)
+- /vakman/[slug] — vakman-profielpagina
+- /plaats/[stad] — stad-overzicht met alle vakgebieden
+- /provincie/[slug] — provincie-overzicht
+- /blog/[slug] — blog-post
+
+## Dataset
+
+Nederlandse vakmensen en bedrijven, 12 vakgebieden, 100+ plaatsen.
+Bron: Kamer van Koophandel (KvK), branche­verenigingen (Techniek
+Nederland, Bouwend Nederland, Tuinkeur, Vebidak, Groenkeur, VLOK,
+NVKL), externe review-platforms (Klantenvertellen, Google).
+
+## Contact
+
+redactie@klushulpgids.nl

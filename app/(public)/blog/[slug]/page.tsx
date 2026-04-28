@@ -10,7 +10,9 @@ import { Container } from '@/components/ui/Container'
 import { EmDashLabel } from '@/components/ui/EmDashLabel'
 import { Label } from '@/components/ui/Label'
 import { Rule } from '@/components/ui/Rule'
+import { JsonLd } from '@/components/seo/JsonLd'
 import { getBlogPostBySlug, getRelatedPosts } from '@/lib/queries'
+import { articleSchema, breadcrumbSchema } from '@/lib/schema'
 
 import styles from './page.module.css'
 
@@ -71,8 +73,28 @@ export default async function BlogPostPage({ params }: { params: Promise<Params>
   const related = await getRelatedPosts(post, 3)
   const minutes = readingMinutes(post.body)
 
+  const schemas = [
+    breadcrumbSchema([
+      { name: 'Home', url: '/' },
+      { name: 'Blog', url: '/blog' },
+      { name: post.title },
+    ]),
+    articleSchema({
+      slug: post.slug,
+      title: post.title,
+      excerpt: post.excerpt,
+      body: post.body,
+      authorName: post.authorName,
+      publishedAt: post.publishedAt,
+      updatedAt: post.updatedAt,
+      coverImageUrl: post.coverImageUrl,
+      coverImageAlt: post.coverImageAlt,
+    }),
+  ]
+
   return (
     <Container>
+      <JsonLd data={schemas} />
       <div className={styles.crumbWrap}>
         <Breadcrumbs
           items={[

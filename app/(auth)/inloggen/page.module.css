@@ -1,0 +1,74 @@
+.wrap {
+  max-width: 480px;
+  margin: var(--sp-9) auto;
+  padding: 0 var(--container-pad);
+}
+
+.title {
+  font-family: var(--font-serif, Georgia, serif);
+  font-size: clamp(36px, 6vw, 56px);
+  line-height: 1.1;
+  letter-spacing: -1px;
+  color: var(--ink);
+  margin: var(--sp-3) 0 var(--sp-4);
+  font-weight: 700;
+}
+
+.italic {
+  font-style: italic;
+  color: var(--accent);
+}
+
+.lede {
+  font-family: var(--font-serif, Georgia, serif);
+  font-size: 18px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  margin: 0 0 var(--sp-7);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  padding: var(--sp-6) 0;
+}
+
+.label {
+  font-family: var(--font-sans, Inter, sans-serif);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--ink-2);
+}
+
+.helper {
+  font-family: var(--font-sans, Inter, sans-serif);
+  font-size: 13px;
+  color: var(--muted);
+  margin: var(--sp-2) 0 0;
+}
+
+.error {
+  font-family: var(--font-sans, Inter, sans-serif);
+  font-size: 14px;
+  color: var(--accent);
+  margin: 0;
+}
+
+.foot {
+  font-size: 14px;
+  color: var(--ink-2);
+  margin: var(--sp-6) 0 0;
+}
+
+.link {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.link:hover {
+  color: var(--ink);
+}

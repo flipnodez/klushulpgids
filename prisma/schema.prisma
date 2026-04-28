@@ -97,10 +97,14 @@ model Tradesperson {
 
   // Verificatie & herkomst
   profileClaimed   Boolean   @default(false)
+  profileClaimedAt DateTime?
   claimToken       String?   @unique
   claimTokenExpiry DateTime?
   kvkVerified      Boolean   @default(false)
   kvkVerifiedAt    DateTime?
+
+  // Privacy: vakman kan profiel tijdelijk verbergen van publiek
+  profileActive Boolean @default(true)
 
   // Reviews-aggregaten (denormalized voor performance)
   ratingAvg          Float?
@@ -294,7 +298,13 @@ model TradespersonPhoto {
   tradespersonId String
   tradesperson   Tradesperson @relation(fields: [tradespersonId], references: [id], onDelete: Cascade)
   url            String
+  /// Bucket-key voor Scaleway object storage. Nodig om het object te kunnen
+  /// verwijderen wanneer de foto wordt weggehaald uit het dashboard.
+  /// Voorbeeld: tradespeople/{tradespersonId}/{photoId}.jpg
+  storageKey     String?
   altText        String?
+  width          Int?
+  height         Int?
   displayOrder   Int          @default(0)
   isCover        Boolean      @default(false)
   createdAt      DateTime     @default(now())
@@ -391,8 +401,15 @@ model User {
   emailVerified  DateTime?
   role           UserRole  @default(TRADESPERSON)
   tradespersonId String?   @unique
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  lastSignInAt   DateTime?
+
+  // Notificatie-voorkeuren (vakman dashboard /instellingen)
+  notifyNewReview            Boolean @default(true)
+  notifyMonthlyStats         Boolean @default(true)
+  notifyAvailabilityReminder Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   accounts Account[]
   sessions Session[]
@@ -406,12 +423,21 @@ enum UserRole {
 }
 
 model Account {
-  id                String @id @default(uuid())
+  id                String  @id @default(uuid())
   userId            String
   type              String
   provider          String
   providerAccountId String
-  user              User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // OAuth-velden (optioneel — niet gebruikt door magic-link, wel door
+  // toekomstige OAuth-providers en het Auth.js Prisma adapter contract).
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
   @@index([userId])

@@ -30,8 +30,8 @@ const DEFAULT_NAV: NavItem[] = [
   { label: 'Home', href: '/' },
   { label: 'Vakgebieden', href: '/vakgebieden' },
   { label: 'Steden', href: '/steden' },
-  { label: 'Zoeken', href: '/zoek' },
-  { label: 'Onze werkwijze', href: '/werkwijze' },
+  { label: 'Zoeken', href: '/zoeken' },
+  { label: 'Onze werkwijze', href: '/over-ons' },
   { label: 'Voor vakmensen', href: '/voor-vakmensen' },
 ]
 

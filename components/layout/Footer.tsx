@@ -38,18 +38,18 @@ const DEFAULT_COLUMNS: FooterColumn[] = [
   {
     label: 'Steden',
     links: [
-      { label: 'Amsterdam', href: '/amsterdam' },
-      { label: 'Rotterdam', href: '/rotterdam' },
-      { label: 'Utrecht', href: '/utrecht' },
-      { label: 'Den Haag', href: '/den-haag' },
-      { label: 'Eindhoven', href: '/eindhoven' },
+      { label: 'Amsterdam', href: '/plaats/amsterdam' },
+      { label: 'Rotterdam', href: '/plaats/rotterdam' },
+      { label: 'Utrecht', href: '/plaats/utrecht' },
+      { label: 'Den Haag', href: '/plaats/den-haag' },
+      { label: 'Eindhoven', href: '/plaats/eindhoven' },
       { label: 'Alle steden', href: '/steden' },
     ],
   },
   {
     label: 'Uitgave',
     links: [
-      { label: 'Onze werkwijze', href: '/werkwijze' },
+      { label: 'Onze werkwijze', href: '/over-ons' },
       { label: 'Voor vakmensen', href: '/voor-vakmensen' },
       { label: 'Contact', href: '/contact' },
       { label: 'Privacy', href: '/privacy' },

@@ -73,15 +73,20 @@ jobs:
           NEXTAUTH_URL: https://klushulpgids.nl
           NEXTAUTH_SECRET: ci-build-only-not-a-real-secret-just-pad-32-chars
 
-      - name: Build log to summary (last 200 lines, always run)
+      - name: Build log to annotation (always run)
         if: always()
         run: |
-          {
-            echo '## Build log (laatste 200 regels)'
-            echo '```'
-            tail -200 /tmp/build.log 2>/dev/null || echo '(no build.log)'
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          if [ -f /tmp/build.log ]; then
+            LOG=$(tail -80 /tmp/build.log | head -c 4500 | python3 -c '
+          import sys
+          s = sys.stdin.read()
+          s = s.replace("%", "%25").replace("\n", "%0A").replace("\r", "%0D")
+          print(s)
+          ')
+            echo "::error title=Build output (last 80 lines, URL-encoded newlines)::${LOG}"
+          else
+            echo "::warning::No /tmp/build.log found"
+          fi
 
       - name: Test (placeholder)
         run: echo "Geen tests in fase 1 — komt vanaf fase 2"

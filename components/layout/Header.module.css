@@ -80,4 +80,9 @@
   .nav {
     display: none;
   }
+  /* Op mobile: alleen "Inloggen" in top-bar — claim staat in hamburger-menu */
+  .topLinkClaim,
+  .topSepClaim {
+    display: none;
+  }
 }

@@ -81,6 +81,53 @@
   color: var(--accent);
 }
 
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  margin-top: var(--sp-6);
+  padding-top: var(--sp-5);
+  border-top: 2px solid var(--ink);
+}
+
+.actionPrimary {
+  display: block;
+  background: var(--ink);
+  color: #fff;
+  padding: 16px 20px;
+  font-family: var(--font-sans, Inter, sans-serif);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  text-decoration: none;
+  text-align: center;
+  transition: background var(--t-fast);
+}
+
+.actionPrimary:hover,
+.actionPrimary:focus-visible {
+  background: var(--accent);
+}
+
+.actionSecondary {
+  display: block;
+  font-family: var(--font-sans, Inter, sans-serif);
+  font-size: 14px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-align: center;
+  padding: 8px 0;
+}
+
+.actionSecondary:hover,
+.actionSecondary:focus-visible {
+  color: var(--accent);
+}
+
 @media (max-width: 720px) {
   .toggle {
     display: inline-flex;

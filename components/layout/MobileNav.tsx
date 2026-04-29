@@ -87,6 +87,23 @@ export function MobileNav({ nav }: Props) {
               </Link>
             ),
           )}
+
+          <div className={styles.actions}>
+            <Link
+              href="/voor-vakmensen/claim"
+              className={clsx('plain', styles.actionPrimary)}
+              onClick={() => setOpen(false)}
+            >
+              Profiel claimen →
+            </Link>
+            <Link
+              href="/inloggen"
+              className={clsx('plain', styles.actionSecondary)}
+              onClick={() => setOpen(false)}
+            >
+              Inloggen
+            </Link>
+          </div>
         </nav>
       </div>
     </>

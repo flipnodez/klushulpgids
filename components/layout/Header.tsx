@@ -74,10 +74,13 @@ export function Header({
           topRight && <span className="label label-accent">{topRight}</span>
         ) : (
           <span className={clsx('label label-muted', styles.topLinks)}>
-            <Link href="/voor-vakmensen/claim" className={styles.topLink}>
+            <Link
+              href="/voor-vakmensen/claim"
+              className={clsx(styles.topLink, styles.topLinkClaim)}
+            >
               Vakman? Claim profiel
             </Link>
-            <span aria-hidden="true" className={styles.topSep}>
+            <span aria-hidden="true" className={clsx(styles.topSep, styles.topSepClaim)}>
               ·
             </span>
             <Link href="/inloggen" className={styles.topLink}>

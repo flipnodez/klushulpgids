@@ -13,7 +13,7 @@ import { env } from '@/lib/env'
  * email-creds.
  */
 
-const LETTERMINT_ENDPOINT = 'https://api.lettermint.co/v1/email/send'
+const LETTERMINT_ENDPOINT = 'https://api.lettermint.co/v1/send'
 
 export type SendEmailInput = {
   to: string
@@ -49,15 +49,19 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
+        Accept: 'application/json',
+        // Lettermint gebruikt een eigen header — geen Authorization: Bearer.
+        // Bron: lettermint-go SDK email.go (req.Header.Set("x-lettermint-token", ...))
+        'X-Lettermint-Token': apiKey,
       },
       body: JSON.stringify({
         from: env.FROM_EMAIL ? env.FROM_EMAIL : FROM_DEFAULT,
-        to: input.to,
+        // Lettermint API verwacht arrays voor to / reply_to
+        to: [input.to],
         subject: input.subject,
         html: input.html,
         text: input.text,
-        reply_to: input.replyTo ?? REPLY_TO_DEFAULT,
+        reply_to: [input.replyTo ?? REPLY_TO_DEFAULT],
       }),
     })
 
@@ -69,8 +73,11 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       }
     }
 
-    const json = (await response.json().catch(() => null)) as { id?: string } | null
-    return { ok: true, id: json?.id }
+    const json = (await response.json().catch(() => null)) as {
+      message_id?: string
+      status?: string
+    } | null
+    return { ok: true, id: json?.message_id }
   } catch (err) {
     return { ok: false, error: (err as Error).message }
   }

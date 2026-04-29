@@ -1,80 +1,52 @@
 /**
- * Diagnostiek voor Lettermint integratie. Run via:
+ * Lettermint test-send. Run via:
  *   scalingo --app klushulpgids run --detached -- npx tsx scripts/diagnose-lettermint.ts
+ *
+ * Stuurt een echte test-mail naar info@zekerverduurzamen.nl met de juiste
+ * endpoint + headers + body shape (zie lettermint-go SDK).
  */
 
 const KEY = process.env.LETTERMINT_API_KEY
 const TO = 'info@zekerverduurzamen.nl'
 
-async function tryEndpoint(url: string, headers: Record<string, string>) {
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...headers },
-      body: JSON.stringify({
-        from: 'Klushulpgids <noreply@klushulpgids.nl>',
-        to: TO,
-        subject: '[diagnostic] Lettermint test',
-        html: '<p>Test van Klushulpgids server.</p>',
-        text: 'Test van Klushulpgids server.',
-        reply_to: 'support@klushulpgids.nl',
-      }),
-    })
-    const body = await res.text().catch(() => '<no body>')
-    return { status: res.status, statusText: res.statusText, body: body.slice(0, 500) }
-  } catch (err) {
-    return { error: (err as Error).message }
-  }
-}
-
 async function main() {
-  console.log('— LETTERMINT DIAGNOSE —')
-  console.log('LETTERMINT_API_KEY set:', !!KEY)
-  console.log('LETTERMINT_API_KEY length:', KEY?.length ?? 0)
-  console.log('LETTERMINT_API_KEY prefix:', KEY ? KEY.slice(0, 6) + '…' : '<missing>')
-  console.log('FROM_EMAIL:', process.env.FROM_EMAIL ?? '<unset>')
-
   if (!KEY) {
-    console.error('✗ KEY ontbreekt — afbreken')
+    console.error('✗ LETTERMINT_API_KEY ontbreekt')
     process.exit(1)
   }
+  console.log('LETTERMINT_API_KEY prefix:', KEY.slice(0, 6) + '…', `(len=${KEY.length})`)
 
-  const tests: Array<{ name: string; url: string; headers: Record<string, string> }> = [
-    {
-      name: 'POST /v1/email/send (Bearer)',
-      url: 'https://api.lettermint.co/v1/email/send',
-      headers: { Authorization: `Bearer ${KEY}` },
-    },
-    {
-      name: 'POST /v1/send (Bearer)',
-      url: 'https://api.lettermint.co/v1/send',
-      headers: { Authorization: `Bearer ${KEY}` },
-    },
-    {
-      name: 'POST /email/send (Bearer)',
-      url: 'https://api.lettermint.co/email/send',
-      headers: { Authorization: `Bearer ${KEY}` },
-    },
-    {
-      name: 'POST /v1/email/send (X-API-Key)',
-      url: 'https://api.lettermint.co/v1/email/send',
-      headers: { 'X-API-Key': KEY },
-    },
-    {
-      name: 'POST /v1/email/send (Token scheme)',
-      url: 'https://api.lettermint.co/v1/email/send',
-      headers: { Authorization: `Token ${KEY}` },
-    },
-  ]
+  const url = 'https://api.lettermint.co/v1/send'
+  console.log(`\n→ POST ${url}`)
+  console.log('   header: X-Lettermint-Token')
 
-  for (const t of tests) {
-    console.log(`\n→ ${t.name}`)
-    console.log(`   URL: ${t.url}`)
-    const result = await tryEndpoint(t.url, t.headers)
-    console.log('   result:', JSON.stringify(result))
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      'X-Lettermint-Token': KEY,
+    },
+    body: JSON.stringify({
+      from: 'Klushulpgids <noreply@klushulpgids.nl>',
+      to: [TO],
+      subject: '[diagnostic] Lettermint test van Klushulpgids',
+      html: '<p>Dit is een diagnostische test. Als u dit ontvangt werkt de Lettermint integratie.</p>',
+      text: 'Dit is een diagnostische test. Als u dit ontvangt werkt de Lettermint integratie.',
+      reply_to: ['support@klushulpgids.nl'],
+    }),
+  })
+
+  const body = await res.text().catch(() => '<no body>')
+  console.log(`   status: ${res.status} ${res.statusText}`)
+  console.log(`   body:   ${body.slice(0, 600)}`)
+
+  if (res.ok) {
+    console.log('\n✓ Mail verstuurd naar', TO)
+  } else {
+    console.log('\n✗ Mail NIET verstuurd')
+    process.exit(1)
   }
-
-  console.log('\n— done —')
 }
 
 main().catch((err) => {

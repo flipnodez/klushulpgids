@@ -62,13 +62,26 @@ jobs:
           DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
 
       - name: Build
-        run: npm run build
+        id: build
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee /tmp/build.log
         env:
           NODE_ENV: production
           DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
           ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
           NEXTAUTH_URL: https://klushulpgids.nl
           NEXTAUTH_SECRET: ci-build-only-not-a-real-secret-just-pad-32-chars
+
+      - name: Build log to summary (last 200 lines, always run)
+        if: always()
+        run: |
+          {
+            echo '## Build log (laatste 200 regels)'
+            echo '```'
+            tail -200 /tmp/build.log 2>/dev/null || echo '(no build.log)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Test (placeholder)
         run: echo "Geen tests in fase 1 — komt vanaf fase 2"

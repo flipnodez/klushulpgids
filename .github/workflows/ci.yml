@@ -68,13 +68,14 @@ jobs:
           npm run build 2>&1 | tee /tmp/build.log
         env:
           NODE_ENV: production
-          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
-          ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
-          NEXTAUTH_URL: https://klushulpgids.nl
-          NEXTAUTH_SECRET: ci-build-only-not-a-real-secret-just-pad-32-chars
+          DATABASE_URL: 'postgresql://ci:ci@localhost:5432/ci'
+          # Quote als string — YAML parst 64 zeros anders als integer 0
+          ENCRYPTION_KEY: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+          NEXTAUTH_URL: 'https://klushulpgids.nl'
+          NEXTAUTH_SECRET: 'ci-build-only-not-a-real-secret-just-pad-32-chars'
 
-      - name: Build log to annotation (always run)
-        if: always()
+      - name: Build log to annotation (only on failure)
+        if: failure()
         run: |
           if [ -f /tmp/build.log ]; then
             LOG=$(tail -80 /tmp/build.log | head -c 4500 | python3 -c '

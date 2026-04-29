@@ -316,38 +316,73 @@ export default async function VakmanProfilePage({ params }: { params: Promise<Pa
       )}
 
       {/* ── Eigen reviews ───────────────────────────────────────────────── */}
-      {reviews.length > 0 && (
-        <>
-          <Rule variant="thick" />
-          <Container>
-            <section className={styles.section}>
+      <Rule variant="thick" />
+      <Container>
+        <section className={styles.section}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'baseline',
+              gap: 'var(--sp-4)',
+              flexWrap: 'wrap',
+            }}
+          >
+            <div>
               <EmDashLabel variant="accent">Reviews</EmDashLabel>
-              <h2 className={`serif ${styles.h2}`}>Wat klanten zeggen.</h2>
-              <div className={styles.reviewList}>
-                {reviews.map((r) => (
-                  <ReviewCard
-                    key={r.id}
-                    review={{
-                      id: r.id,
-                      reviewerName: r.reviewerName,
-                      reviewerCity: r.reviewerCity,
-                      rating: r.rating,
-                      title: r.title,
-                      body: r.body,
-                      jobDate: r.jobDate,
-                      createdAt: r.createdAt.toISOString(),
-                      verificationMethod: r.verificationMethod,
-                      ownerResponse: r.ownerResponse,
-                      ownerResponseAt: r.ownerResponseAt?.toISOString(),
-                      companyName: tp.companyName,
-                    }}
-                  />
-                ))}
-              </div>
-            </section>
-          </Container>
-        </>
-      )}
+              <h2 className={`serif ${styles.h2}`}>
+                {reviews.length > 0 ? 'Wat klanten zeggen.' : 'Nog geen reviews.'}
+              </h2>
+            </div>
+            <Link
+              href={`/vakman/${tp.slug}/review`}
+              className={styles.allLink}
+              style={{
+                background: 'var(--ink)',
+                color: '#fff',
+                padding: '12px 20px',
+                textDecoration: 'none',
+                fontFamily: 'var(--font-sans, Inter, sans-serif)',
+                fontSize: 13,
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                letterSpacing: 0.5,
+                marginTop: 0,
+              }}
+            >
+              Schrijf review →
+            </Link>
+          </div>
+          {reviews.length > 0 ? (
+            <div className={styles.reviewList}>
+              {reviews.map((r) => (
+                <ReviewCard
+                  key={r.id}
+                  review={{
+                    id: r.id,
+                    reviewerName: r.reviewerName,
+                    reviewerCity: r.reviewerCity,
+                    rating: r.rating,
+                    title: r.title,
+                    body: r.body,
+                    jobDate: r.jobDate,
+                    createdAt: r.createdAt.toISOString(),
+                    verificationMethod: r.verificationMethod,
+                    ownerResponse: r.ownerResponse,
+                    ownerResponseAt: r.ownerResponseAt?.toISOString(),
+                    companyName: tp.companyName,
+                  }}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className={styles.body}>
+              Wees de eerste die een review achterlaat — uw ervaring helpt anderen een goede keuze
+              te maken.
+            </p>
+          )}
+        </section>
+      </Container>
 
       {/* ── Hoe wij verifiëren ──────────────────────────────────────────── */}
       <Rule variant="thick" />

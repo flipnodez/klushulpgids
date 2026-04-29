@@ -149,4 +149,4 @@ Week 4:
 
 - [ ] GSC indexed ≥ 1000 URLs
 - [ ] Eerste rankings op long-tail queries (zoek `site:klushulpgids.nl
-    loodgieter amsterdam`)
+loodgieter amsterdam`)

@@ -15,3 +15,10 @@ __pycache__
 # Seed data (gecureerd, niet door prettier laten formatteren)
 prisma/seed-data/sample-tradespeople.json
 prisma/seed-data/updates-*.json
+
+# Lokale data-archieven en scrape-output (niet gecommit, maar voorkom
+# dat ze format-checks blokkeren als ze er wel staan)
+_archive/
+data-archive/
+bn_websites_*.json
+*.json.bak

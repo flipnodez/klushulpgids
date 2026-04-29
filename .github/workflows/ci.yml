@@ -16,6 +16,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    services:
+      # Lege Postgres voor build-time prerendering. Build-time SQL is
+      # read-only — pagina's renderen tegen een lege schema, sitemap valt
+      # graceful terug op statische lijst.
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -38,10 +56,19 @@ jobs:
       - name: Format check
         run: npm run format:check
 
+      - name: Apply Prisma migrations to CI database
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+
       - name: Build
         run: npm run build
         env:
           NODE_ENV: production
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
+          NEXTAUTH_URL: https://klushulpgids.nl
+          NEXTAUTH_SECRET: ci-build-only-not-a-real-secret-just-pad-32-chars
 
       - name: Test (placeholder)
         run: echo "Geen tests in fase 1 — komt vanaf fase 2"

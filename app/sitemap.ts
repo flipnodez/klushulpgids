@@ -22,19 +22,48 @@ const BASE_URL = 'https://klushulpgids.nl'
  * Wordt opnieuw gegenereerd bij elke deploy (geen revalidate). Voor
  * vakers updates: trigger handmatig een redeploy of voeg revalidate toe.
  */
+// ISR: regenereer max 1× per uur. Voorkomt dat de DB op iedere request
+// wordt aangeroepen (~7900 URLs is duur) én het maakt build-time-rendering
+// optioneel — als de DB tijdens de build niet bereikbaar is (bv. CI zonder
+// DATABASE_URL) krijgen we een minimale static sitemap, en wordt de volledige
+// versie gegenereerd op de eerste request na deploy.
+export const revalidate = 3600
+
+type TradeRow = { slug: string; updatedAt: Date }
+type CityRow = { slug: string; updatedAt: Date }
+type TpRow = { slug: string; updatedAt: Date }
+type PostRow = { slug: string; updatedAt: Date; publishedAt: Date | null }
+
+async function fetchSitemapData(): Promise<{
+  trades: TradeRow[]
+  cities: CityRow[]
+  tradespeople: TpRow[]
+  posts: PostRow[]
+}> {
+  try {
+    const [trades, cities, tradespeople, posts] = await Promise.all([
+      prisma.trade.findMany({ select: { slug: true, updatedAt: true } }),
+      prisma.city.findMany({ select: { slug: true, updatedAt: true } }),
+      prisma.tradesperson.findMany({
+        where: { qualityScore: { gte: 30 } },
+        select: { slug: true, updatedAt: true },
+      }),
+      prisma.blogPost.findMany({
+        where: { publishedAt: { not: null, lte: new Date() } },
+        select: { slug: true, updatedAt: true, publishedAt: true },
+      }),
+    ])
+    return { trades, cities, tradespeople, posts }
+  } catch (err) {
+    // Database unreachable (bv. CI build zonder DATABASE_URL) — log en
+    // genereer een minimale sitemap met alleen statische pagina's.
+    console.warn('[sitemap] DB-onbereikbaar, genereer minimale sitemap:', (err as Error).message)
+    return { trades: [], cities: [], tradespeople: [], posts: [] }
+  }
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [trades, cities, tradespeople, posts] = await Promise.all([
-    prisma.trade.findMany({ select: { slug: true, updatedAt: true } }),
-    prisma.city.findMany({ select: { slug: true, updatedAt: true } }),
-    prisma.tradesperson.findMany({
-      where: { qualityScore: { gte: 30 } },
-      select: { slug: true, updatedAt: true },
-    }),
-    prisma.blogPost.findMany({
-      where: { publishedAt: { not: null, lte: new Date() } },
-      select: { slug: true, updatedAt: true, publishedAt: true },
-    }),
-  ])
+  const { trades, cities, tradespeople, posts } = await fetchSitemapData()
 
   const now = new Date()
 

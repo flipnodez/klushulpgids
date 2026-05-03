@@ -32,21 +32,26 @@ export function emailShell({ preheader, body }: { preheader: string; body: strin
   <title>Klushulpgids</title>
   <style>
     /* Mobile overrides — gracefully ignored door Outlook desktop. */
-    @media only screen and (max-width: 480px) {
-      .em-outer-cell { padding: 20px 0 !important; }
-      .em-card { width: 100% !important; }
+    @media only screen and (max-width: 600px) {
+      .em-outer-cell { padding: 16px 0 !important; }
+      .em-card { width: 100% !important; max-width: 100% !important; border-left: 0 !important; border-right: 0 !important; }
       .em-header-cell { padding: 14px 18px !important; }
       .em-brand { font-size: 19px !important; }
       .em-tagline { display: block !important; margin-left: 0 !important; margin-top: 4px !important; }
       .em-body-cell { padding: 22px 18px !important; }
       .em-footer-cell { padding: 14px 18px !important; font-size: 12px !important; }
-      .em-h1 { font-size: 24px !important; line-height: 1.18 !important; }
-      .em-p { font-size: 16px !important; line-height: 1.5 !important; }
+      .em-h1 { font-size: 22px !important; line-height: 1.2 !important; letter-spacing: -0.3px !important; }
+      .em-p { font-size: 15px !important; line-height: 1.55 !important; }
       .em-muted { font-size: 13px !important; }
       .em-em-dash { font-size: 11px !important; letter-spacing: 2px !important; }
       .em-btn-table { width: 100% !important; }
       .em-btn { display: block !important; padding: 16px 20px !important; text-align: center !important; }
+      .em-link { word-break: break-all !important; }
     }
+    /* Lange URLs binnen muted-paragrafen mogen overal breken zodat de layout
+       op smalle schermen niet exploeert. */
+    .em-muted { word-break: break-word; overflow-wrap: anywhere; }
+    .em-p { word-break: break-word; overflow-wrap: break-word; }
     /* Donkere clients (iOS dark mode etc.) — voorkom dat zwart op zwart wordt. */
     @media (prefers-color-scheme: dark) {
       .em-card { background: #fff !important; }
@@ -99,6 +104,15 @@ export function paragraph(html: string): string {
 
 export function muted(text: string): string {
   return `<p class="em-muted" style="font-family:Inter,Arial,sans-serif;font-size:13px;line-height:1.5;color:${BRAND_MUTED};margin:0 0 16px;">${escapeHtml(text)}</p>`
+}
+
+/**
+ * Mobile-vriendelijke "plak deze link in uw browser"-fallback. De URL wordt
+ * gerenderd als een klikbare anchor met `word-break: break-all` zodat lange
+ * tokens netjes wrappen op smalle schermen.
+ */
+export function linkFallback(label: string, url: string): string {
+  return `<p class="em-muted" style="font-family:Inter,Arial,sans-serif;font-size:13px;line-height:1.5;color:${BRAND_MUTED};margin:0 0 16px;">${escapeHtml(label)}<br><a class="em-link" href="${escapeHtml(url)}" style="color:${BRAND_PRIMARY};text-decoration:underline;word-break:break-all;overflow-wrap:anywhere;">${escapeHtml(url)}</a></p>`
 }
 
 /**
